@@ -29,11 +29,11 @@ class TestCorticalStimulationWithOptogeneticArray:
     def setup_class(cls):
         global test_dir
         test_dir = str(pathlib.Path(__file__).parent.parent)
-        model_params = load_parameters(test_dir + "/sheets/model_params")
-        cls.sheet_params = load_parameters(test_dir + "/sheets/exc_sheet_params")
+        model_params = load_parameters(test_dir + "/sheets/DirectStimulatorTests/model_params")
+        cls.sheet_params = load_parameters(test_dir + "/sheets/DirectStimulatorTests/exc_sheet_params")
         cls.sheet_params.min_depth = 100
         cls.sheet_params.max_depth = 400
-        cls.opt_array_params = load_parameters(test_dir + "/sheets/opt_array_params")
+        cls.opt_array_params = load_parameters(test_dir + "/sheets/DirectStimulatorTests/opt_array_params")
         cls.set_sheet_size(cls, 400)
         cls.model = Model(nest, 8, model_params)
         cls.sheet = VisualCorticalUniformSheet3D(
@@ -245,7 +245,7 @@ class TestOptogeneticArrayImageStimulus(TestCorticalStimulationWithOptogeneticAr
             self.sheet,
             ParameterSet(
                 {
-                    "map_location": test_dir + "/sheets/or_map",
+                    "map_location": test_dir + "/sheets/DirectStimulatorTests/or_map",
                     "map_stretch": 1,
                     "sigma": 0,
                     "periodic": True,
@@ -253,13 +253,13 @@ class TestOptogeneticArrayImageStimulus(TestCorticalStimulationWithOptogeneticAr
             ),
         )
 
-        f = open(test_dir + "/sheets/or_map", "rb")
+        f = open(test_dir + "/sheets/DirectStimulatorTests/or_map", "rb")
         or_map = pickle.load(f, encoding="latin1")
         f.close()
-        np.save(test_dir + "/sheets/or_map.npy", circular_dist(0, or_map, 1))
+        np.save(test_dir + "/sheets/DirectStimulatorTests/or_map.npy", circular_dist(0, or_map, 1))
 
         dss = self.get_experiment_direct_stimulators(
-            im_path=test_dir + "/sheets/or_map.npy", intensity_scaler=1.0
+            im_path=test_dir + "/sheets/DirectStimulatorTests/or_map.npy", intensity_scaler=1.0
         )
         anns = self.model.neuron_annotations()["exc_sheet"]
         ids = self.model.neuron_ids()["exc_sheet"]
@@ -277,23 +277,23 @@ class TestOptogeneticArrayImageStimulus(TestCorticalStimulationWithOptogeneticAr
             self.sheet,
             ParameterSet(
                 {
-                    "map_location": test_dir + "/sheets/or_map",
+                    "map_location": test_dir + "/sheets/DirectStimulatorTests/or_map",
                     "map_stretch": 1,
                     "sigma": 0,
                     "periodic": True,
                 }
             ),
         )
-        f = open(test_dir + "/sheets/or_map", "rb")
+        f = open(test_dir + "/sheets/DirectStimulatorTests/or_map", "rb")
         or_map = pickle.load(f, encoding="latin1")
         f.close()
-        np.save(test_dir + "/sheets/or_map.npy", circular_dist(0, or_map, 1))
+        np.save(test_dir + "/sheets/DirectStimulatorTests/or_map.npy", circular_dist(0, or_map, 1))
         dss = self.get_experiment_direct_stimulators(
-            im_path=test_dir + "/sheets/or_map.npy", intensity_scaler=1.0
+            im_path=test_dir + "/sheets/DirectStimulatorTests/or_map.npy", intensity_scaler=1.0
         )
         msp_full = dss[0].mixed_signals_photo.sum()
         dss = self.get_experiment_direct_stimulators(
-            im_path=test_dir + "/sheets/or_map.npy", intensity_scaler=intensity_scaler
+            im_path=test_dir + "/sheets/DirectStimulatorTests/or_map.npy", intensity_scaler=intensity_scaler
         )
         msp_is = dss[0].mixed_signals_photo.sum()
         assert np.isclose(msp_is / msp_full, intensity_scaler)
@@ -329,7 +329,7 @@ class TestOptogeneticArrayStimulusOrientationTuningProtocol(
             self.sheet,
             ParameterSet(
                 {
-                    "map_location": "tests/sheets/or_map",
+                    "map_location": "tests/sheets/DirectStimulatorTests/or_map",
                     "map_stretch": 1,
                     "sigma": 0,
                     "periodic": True,
