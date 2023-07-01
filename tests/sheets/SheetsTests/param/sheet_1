@@ -1,42 +1,36 @@
 {
-    #Basic Sheet parameters
-    
-    'component': 'mozaik.sheets.__init__.Sheet',
-    
-    'params': {
 
-        'cell': {
+    'cell': {
 
-            'model': 'EIF_cond_exp_isfa_ista',
-            
-            'params': {
-                'v_rest': -60,
-                'v_reset': -55.0,
-                'tau_refrac': 2.0,
-                'tau_m': 17.0,
-                'cm': 0.06,
-                'e_rev_E': 0.0,
-                'e_rev_I': -80.0,
-                'tau_syn_E': 7.0,
-                'tau_syn_I': 11.0,
-                'a' : -0.8,
-                'b' : 0.08,
-                'delta_T' : 0.8,
-                'tau_w' : 88.0,
-                'v_thresh' : -53.0,
-            },
-
-            'initial_values': {
-                'v': PyNNDistribution(name = 'uniform', low = -70, high = -51),
-            },
+        'model': 'EIF_cond_exp_isfa_ista',
         
+        'params': {
+            'v_rest': -60,
+            'v_reset': -55.0,
+            'tau_refrac': 2.0,
+            'tau_m': 17.0,
+            'cm': 0.06,
+            'e_rev_E': 0.0,
+            'e_rev_I': -80.0,
+            'tau_syn_E': 7.0,
+            'tau_syn_I': 11.0,
+            'a' : -0.8,
+            'b' : 0.08,
+            'delta_T' : 0.8,
+            'tau_w' : 88.0,
+            'v_thresh' : -53.0,
         },
 
-        'mpi_safe' : False,
-        'artificial_stimulators' : {},
-        'name':'sheet',
-        'recorders' : None,
-        'recording_interval'  :  1.0,
+        'initial_values': {
+            'v': PyNNDistribution(name = 'uniform', low = -70, high = -51),
+        },
     
-    }
+    },
+
+    'mpi_safe' : False,
+    'artificial_stimulators' : {},
+    'name':'sheet',
+    'recorders' : None,
+    'recording_interval'  :  1.0,
+
 }
