@@ -17,9 +17,9 @@ from collections import OrderedDict
 class TestSheet():
 
     @pytest.fixture(scope="module", params=["sheet_0", "sheet_1"])
-    def init_sheet(request):
-        params = MozaikExtendedParameterSet("tests/sheets/SheetsTests/param/defaults")
-        params.sheets.sheet = f"url({request.param})"
+    def init_sheet(self, request):
+        params = MozaikExtendedParameterSet("SheetsTests/param/defaults")
+        params.sheets.sheet = f'url("{request.param}")'
 
         model = ModelForSheets(sim, 1, params) # prvni na chybu a vyzkoušet více než jen 1
         sheet = model.sheets.sheet
@@ -27,7 +27,7 @@ class TestSheet():
         yield sheet, params
 
 
-    def test_init(init_sheet):
+    def test_init(self, init_sheet):
         sheet, params = init_sheet
 
         # check ze byla zavolana init BaseComponent se spravnyma parametrama např num_of_threads = 1
@@ -39,7 +39,7 @@ class TestSheet():
         pytest.assert_array_equal(expected_values, actual_values)
 
 
-    def test_setup_to_record_list(init_sheet):
+    def test_setup_to_record_list(self, init_sheet):
         sheet, _ = init_sheet
 
         sheet.setup_to_record_list()
@@ -51,7 +51,7 @@ class TestSheet():
             # jestě něco
 
 
-    def test_size_in_degrees(init_sheet):
+    def test_size_in_degrees(self, init_sheet):
         sheet, _ = init_sheet
 
         with pytest.raises(NotImplementedError):
@@ -59,7 +59,7 @@ class TestSheet():
 
 
     @pytest.mark.parametrize("all_cells", [np.array([2,3,15.212,0.5,-2.5]), np.array([2,3,15.212,0.5,-2.5])])
-    def test_pop(init_sheet, all_cells):
+    def test_pop(self, init_sheet, all_cells):
         sheet, _ = init_sheet
 
         assert sheet.pop == None
@@ -81,7 +81,7 @@ class TestSheet():
 
 
     @pytest.mark.parametrize("neuron_number,key,value,protected", [(1,"annotation_name", "annotation", False), (2,"annotation_name", "annotation", True)])
-    def test_add_neuron_annotation(init_sheet, neuron_number, key, value, protected): # mel bych dodat jeste parametr 'result'
+    def test_add_neuron_annotation(self, init_sheet, neuron_number, key, value, protected): # mel bych dodat jeste parametr 'result'
         sheet, _ = init_sheet
 
         sheet.add_neuron_annotation(neuron_number, key, value, protected) # logger Pop not have been set yet
@@ -101,7 +101,7 @@ class TestSheet():
 
 
     @pytest.mark.parametrize("neuron_number,key,result", [(0, 'key0', 'ann0'), (1, 'key1', 'ann1'), (2, 'key3', "logger msg"), (5, 'key0', "OutOfRangeError")]) #?
-    def test_get_neuron_annotation(init_sheet, neuron_number, key, result):
+    def test_get_neuron_annotation(self, init_sheet, neuron_number, key, result):
         sheet, _ = init_sheet
 
         sheet.add_neuron_annotation(neuron_number, key) # logger Pop not have been set yet, ale dostanu return value None nebo muzu tky error
@@ -117,7 +117,7 @@ class TestSheet():
         assert sheet.get_neuron_annotation(neuron_number, key) == result
 
 
-    def test_get_neuron_annotations(init_sheet):
+    def test_get_neuron_annotations(self, init_sheet):
         sheet, _ = init_sheet
 
         sheet.get_neuron_annotations() # a měl bych dostat od logger.error, nebo taky navratovou hodnotu []? (nebo logger.error mě raisne)
@@ -136,13 +136,13 @@ class TestSheet():
 
 
     @pytest.mark.parametrize("template,render", [('default', lambda t, c: f"{t}_{c}")]) #lambda t, c: Template(t).safe_substitute(c)), ()]) # from string import Template
-    def test_describe(init_sheet, template, render):
+    def test_describe(self, init_sheet, template, render):
         sheet, _ = init_sheet
 
         sheet.describe(template) == "Sheet" ## ale co s renderem
 
 
-    def test_record(init_sheet):
+    def test_record(self, init_sheet):
         sheet, _ = init_sheet
 
         _pop_mock = MagicMock()
@@ -159,7 +159,7 @@ class TestSheet():
 
 
     @pytest.mark.parametrize("stimulus_duration", [None, 1, 4.2, 0, -1, 0.00001])
-    def test_get_data(init_sheet, stimulus_duration):
+    def test_get_data(self, init_sheet, stimulus_duration):
         sheet, params = init_sheet
 
         _pop_mock = MagicMock()
@@ -179,14 +179,14 @@ class TestSheet():
         assert sheet.get_data(stimulus_duration) == segment # ale změněnej
 
 
-    def test_mean_spike_count(init_sheet):
+    def test_mean_spike_count(self, init_sheet):
         sheet, _ = init_sheet
 
         assert sheet.mean_spike_count() == sheet.msc
 
 
-    @pytest.mark.parametrize("duration,offset,additional_stimulators", [(0.6, 0.4, []), ()])
-    def test_prepare_artificial_stimulation(init_sheet, duration, offset, additional_stimulators):
+    @pytest.mark.parametrize("duration,offset,additional_stimulators", [(0.6, 0.4, [])])
+    def test_prepare_artificial_stimulation(self, init_sheet, duration, offset, additional_stimulators):
         sheet, _ = init_sheet
 
         # ds by měl být stimulator, který obsahuje additional_stimulator třeba
@@ -196,7 +196,7 @@ class TestSheet():
             # checknout kolikrát for loop běžel len(additional_stimulators)+len(sheet.artificial_stimulators)
 
 
-    def test_setup_artificial_stimulation(init_sheet):
+    def test_setup_artificial_stimulation(self, init_sheet):
         sheet, params = init_sheet
 
         sheet.setup_artificial_stimulation()
@@ -204,7 +204,7 @@ class TestSheet():
         assert len(sheet.artificial_stimulators) == len(params.sheets.sheet.params.artificial_stimulators) # ještě něco
 
 
-    def test_setup_initial_values(init_sheet):
+    def test_setup_initial_values(self, init_sheet):
         sheet, params = init_sheet
 
         sheet.setup_initial_values() # pyNN populace s initialize a set
@@ -217,38 +217,39 @@ class TestSheet():
 class TestRetinalUniformSheet:
 
     @pytest.fixture(params=[(11.2, 20.1, 3), (14., 5.5, 6)]) # (sx, sy, density)
-    def init_sheet(request):
+    def init_sheet(self, request):
         args = request.param
-
-        params = MozaikExtendedParameterSet("tests/sheets/SheetsTests/param/defaults")
+    
+        params = MozaikExtendedParameterSet("SheetsTests/param/defaults")
         sh_params = params.sheets.sheet.params
-        sh_params[sx], sh_params[sy], sh_params[density] = args[0], args[1], args[2]
+        sh_params['sx'], sh_params['sy'], sh_params['density'] = args[0], args[1], args[2]
         
         model = ModelForSheets(sim, 1, params)
         sheet = model.sheets.sheet
 
-        return sheet
+        return sheet, args
 
     
-    @pytest.mark.parametrize("sx,sy,density", [(11.2, 20.1, 3), (14., 5.5, 6)]) # (sx, sy, density)
-    def test_init(sx, sy, density):
-        params = MozaikExtendedParameterSet("tests/sheets/SheetsTests/param/defaults")
+    @pytest.mark.parametrize("sx,sy,density", [(11.2, 20.1, 3), (14.0, 5.5, 6)]) # (sx, sy, density)
+    def test_init(self, sx, sy, density):
+        params = MozaikExtendedParameterSet("SheetsTests/param/defaults")
         sh_params = params.sheets.sheet.params
-        sh_params[sx], sh_params[sy], sh_params[density] = sx, sy, density # rekl bych ze je problem s tim, ze v TestSheet nezkousim i jiny parametry jako sx,sy..
+        sh_params['sx'], sh_params['sy'], sh_params['density'] = sx, sy, density # rekl bych ze je problem s tim, ze v TestSheet nezkousim i jiny parametry jako sx,sy..
         
         with patch.object(Sheet, '__init__') as mock_init:
             model = ModelForSheets(sim, 1, params)
             sheet = model.sheets.sheet
             mock_init.assert_called_once()
-            
         
         # otestovat ze se assignlo správně self.pop
 
         # nejak otestovat ze se volalo self.pop.positions
 
 
-    def test_size_in_degrees(init_sheet):
-        assert init_sheet.test_size_in_degrees() == (init_sheet.args[0], init_sheet.args[1])
+    def test_size_in_degrees(self, init_sheet):
+        sheet, args = init_sheet
+
+        assert sheet.test_size_in_degrees() == (args[0], args[1])
 
 
 
@@ -256,16 +257,16 @@ class TestRetinalUniformSheet:
 class TestSheetWithMagnificationFactor:
 
     @pytest.fixture(params=[(1.2, 2.1, 3), (4., .5, 6)]) # (magnification_factor, sx, sy)
-    def init_sheet(request):
+    def init_sheet(self, request):
         args = request.param
-        params = MozaikExtendedParameterSet("tests/sheets/SheetsTests/param/defaults")  
+        params = MozaikExtendedParameterSet("SheetsTests/param/defaults")  
         model = ModelForSheets(sim, 1, params)
         sheet = model.sheets.sheet
 
         return sheet, args
 
 
-    def test__init__(init_sheet):
+    def test_init(self, init_sheet):
         sheet, args = init_sheet
 
         expected_values, actual_values = np.array([]), np.array([])
@@ -274,7 +275,7 @@ class TestSheetWithMagnificationFactor:
 
     
     @pytest.mark.parametrize("degree_x,degree_y", [(10, 20), (5, 5)])
-    def test_vf_2_cs(init_sheet, degree_x, degree_y):
+    def test_vf_2_cs(self, init_sheet, degree_x, degree_y):
         sheet, args = init_sheet
         mag = args[0]
         
@@ -282,7 +283,7 @@ class TestSheetWithMagnificationFactor:
 
 
     @pytest.mark.parametrize("micro_meters_x,micro_meters_y", [(10, 20), (5, 5)])
-    def test_cs_2_vf(init_sheet, micro_meters_x, micro_meters_y):
+    def test_cs_2_vf(self, init_sheet, micro_meters_x, micro_meters_y):
         sheet, args = init_sheet
         mag = args[0]
         
@@ -290,13 +291,13 @@ class TestSheetWithMagnificationFactor:
 
 
     @pytest.mark.parametrize("distance_vf", [1,2,3])
-    def test_dvf_2_dcs(init_sheet, distance_vf):
+    def test_dvf_2_dcs(self, init_sheet, distance_vf):
         sheet, args = init_sheet
 
         assert sheet.dvf_2_dcs(distance_vf) == distance_vf * args[0]
 
 
-    def test_size_in_degrees(init_sheet):
+    def test_size_in_degrees(self, init_sheet):
         sheet, params = init_sheet
         sh_params = params.sheets.sheet.params
  
@@ -308,16 +309,16 @@ class TestSheetWithMagnificationFactor:
 class TestVisualCorticalUniformSheet:
 
     @pytest.fixture(params=[5, 10]) # density
-    def init_sheet(request):
+    def init_sheet(self, request):
         args = request.param
-        params = MozaikExtendedParameterSet("tests/sheets/SheetsTests/param/defaults") # *args 
+        params = MozaikExtendedParameterSet("SheetsTests/param/defaults") 
         model = ModelForSheets(sim, 1, params)
         sheet = model.sheets.sheet
 
         return sheet
 
 
-    def test_init(init_sheet):
+    def test_init(self, init_sheet):
         pass
 
 
@@ -326,15 +327,15 @@ class TestVisualCorticalUniformSheet:
 class TestVisualCorticalUniformSheet3D:
 
     @pytest.fixture(params=[(1.2, 2.1), (4., .5)]) # (min_depth, max_depth)
-    def init_sheet(request):
+    def init_sheet(self, request):
         args = request.param
-        params = MozaikExtendedParameterSet("tests/sheets/SheetsTests/param/defaults") # *args    
+        params = MozaikExtendedParameterSet("SheetsTests/param/defaults")    
         model = ModelForSheets(sim, 1, params)
         sheet = model.sheets.sheet
 
         return sheet
     
 
-    def test_init(init_sheet):
+    def test_init(self, init_sheet):
         pass
     
