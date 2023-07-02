@@ -30,7 +30,7 @@
     'mpi_safe' : False,
     'artificial_stimulators' : {},
     'name':'sheet',
-    'recorders' : None,
+    'recorders' : {},
     'recording_interval'  :  1.0,
 
 }
