@@ -6,6 +6,7 @@ from pyNN import space
 from collections import OrderedDict
 from string import Template
 from pyNN.errors import NothingToWriteError
+import pyNN.nest
 from mozaik.tools.distribution_parametrization import PyNNDistribution
 from mozaik.sheets.direct_stimulator import DirectStimulator
 
@@ -13,6 +14,7 @@ import pytest
 from unittest.mock import MagicMock
 from unittest.mock import patch
 from unittest.mock import call
+
 
 from mozaik.sheets import Sheet
 
@@ -33,7 +35,7 @@ class TestSheet():
 
     @pytest.fixture
     def init_sheet(self, mock_model, params):
-        yield Sheet(mock_model, None, None, params), params # místo None, None dát do params sx a sy
+        yield Sheet(mock_model, None, None, params), params # instead of None, parametrize sx, sy
 
 
     # __INIT__    
@@ -92,7 +94,7 @@ class TestSheet():
             sheet.size_in_degrees()
 
 
-    @pytest.fixture(scope="function", params=[np.array([2,3,15.212,0.5,-2.5]), np.array([2,3,0.5,-2.5])]) # přidat i weird
+    @pytest.fixture(scope="function", params=[np.array([2,3,15.212,0.5,-2.5]), np.array([2,3,0.5,-2.5])]) # add more weird parameters
     def _pop_mock(self, request):
         all_cells = request.param
 
@@ -114,8 +116,8 @@ class TestSheet():
             sheet.pop = _pop_mock
             mock_arti_stim.assert_called_once()
             mock_init_val.assert_called_once()
-            # je rozdil mezi sheet.pop a sheet._pop z vnějšku?
-        assert sheet.pop == _pop_mock and len(sheet._neuron_annotations) == len(_pop_mock.all_cells) # check jestli to v neuron annotations je OrderedDict
+
+        assert sheet.pop == _pop_mock and len(sheet._neuron_annotations) == len(_pop_mock.all_cells) # check if neuron annotations contain OrderedDict type
 
     
     def test_pop_not_set(self, init_sheet):
@@ -155,11 +157,11 @@ class TestSheet():
     # ADD_NEURON_ANNOTATION
 
     @pytest.mark.parametrize("neuron_number,key,value,protected", [(1,"annotation_name", "annotation", False), (2,"annotation_name", "annotation", True)])
-    def test_add_neuron_annotation_assign(self, init_sheet, _pop_mock_and_neuron_annotations, neuron_number, key, value, protected): # mel bych dodat jeste parametr 'result'
+    def test_add_neuron_annotation_assign(self, init_sheet, _pop_mock_and_neuron_annotations, neuron_number, key, value, protected):
         sheet, _ = init_sheet
         sheet.pop, sheet._neuron_annotations = _pop_mock_and_neuron_annotations
 
-        sheet.add_neuron_annotation(neuron_number, key, value, protected) # pokud tam neuron_number není, nebo není key, tak to spadne (KeyError)?
+        sheet.add_neuron_annotation(neuron_number, key, value, protected) # if neuron_number or key is missing -> KeyError
 
         assert sheet._neuron_annotations[neuron_number][key] == (protected, value) # or logger Annotation protected
 
@@ -167,10 +169,10 @@ class TestSheet():
     def test_add_neuron_annotation_pop_not_set(self, init_sheet):
         sheet, _ = init_sheet
         pass
-        # assert sheet.add_neuron_annotation(neuron_number, key, value, protected) # logger Pop not have been set yet TOHLE SPADNE
+        # assert sheet.add_neuron_annotation(neuron_number, key, value, protected) # logger Pop not have been set yet THIS FAILS
 
 
-    @pytest.fixture(params=["normal", "upper_bound", "lower_bound"]) #, "protected", "missing_key", "missing_neuron"]) # nemam scope? a nechci to jen nejak parametrizovat? misto fixture
+    @pytest.fixture(params=["normal", "upper_bound", "lower_bound"]) #, "protected", "missing_key", "missing_neuron"]) # which scope? parametrize instead of fixture?
     def sheet_neuron_num_key_result(self, request, init_sheet, _pop_mock_and_neuron_annotations):
         sheet, _ = init_sheet
         _pop_mock, _neuron_annotations = _pop_mock_and_neuron_annotations
@@ -219,13 +221,13 @@ class TestSheet():
     def test_get_neuron_annotation_value(self, sheet_neuron_num_key_result):
         sheet, neuron_number, key, result = sheet_neuron_num_key_result
 
-        assert sheet.get_neuron_annotation(neuron_number, key) == result # try error msg smh
+        assert sheet.get_neuron_annotation(neuron_number, key) == result # check error msg logger smh
 
     
     def test_get_neuron_annotation_pop_not_set(self, init_sheet):
         sheet, _ = init_sheet
         pass
-        # assert sheet.get_neuron_annotation(neuron_number, key) # logger Pop not have been set yet, ale dostanu return value None nebo muzu tky error
+        # assert sheet.get_neuron_annotation(neuron_number, key) # logger Pop not have been set yet, but i get return value None or check error
 
 
     # GET_NEURON_ANNOTATIONS
@@ -250,7 +252,7 @@ class TestSheet():
     def test_get_neuron_annotations_pop_not_set(self, init_sheet):
         sheet, _ = init_sheet
         pass
-        # assert sheet.get_neuron_annotations() # a měl bych dostat od logger.error, nebo taky navratovou hodnotu []? (nebo logger.error mě raisne)
+        # assert sheet.get_neuron_annotations() # check logger.error
 
 
     # DESCRIBE
@@ -336,7 +338,7 @@ class TestSheet():
 
     # MEAN_SPIKE_COUNT
 
-    @pytest.mark.parametrize("value", [10, -10, 0.000001])
+    @pytest.mark.parametrize("value", [10, -10, 0.0000001])
     def test_mean_spike_count(self, init_sheet, value):
         sheet, _ = init_sheet
         sheet.msc = value
@@ -388,8 +390,8 @@ class TestSheet():
             mock_pop_set.assert_called_once_with(**sheet.dist_params)
 
 
-    def test_setup_initial_values_pine(self, init_sheet): # ?? nebo to je na testování pine  # pyNN populace s initialize a set
-        pass # zkontrolovat jestli odpovídají tomu co je v args
+    def test_setup_initial_values_pine(self, init_sheet):
+        pass # pyNN population with initialize a set
 
 
 
@@ -399,8 +401,7 @@ class TestRetinalUniformSheet:
 
     @pytest.fixture
     def mock_model(self):
-        model = MagicMock()
-        model.sim = MagicMock(Population = MagicMock())
+        model = MagicMock(sim = pyNN.nest)
         
         yield model
 
@@ -427,9 +428,18 @@ class TestRetinalUniformSheet:
 
     def test_init_assertions(self, init_sheet):
         sheet, params = init_sheet
-        # otestovat ze se assignlo správně self.pop
-        # nejak otestovat ze se volalo self.pop.positions
-        assert isinstance(sheet.pop, Population) # pyNN.nest.Population
+        
+        assert isinstance(sheet.pop, pyNN.nest.Population)
+        # assert sheet.pop... == int(parameters.sx * parameters.sy * parameters.density)
+        # assert sheet.pop... == getattr(sheet.model.sim, params.cell.model)
+        # assert sheet.pop...params? == params.cell.params
+        assert isinstance(sheet.pop.structure, space.RandomStructure)
+        # assert sheet.pop.structure.boundary == space.Cuboid(params.sx, params.sy, 0)
+        # assert sheet.pop.structure... ==
+        # assert sheet.pop.initial_values == params.cell.initial_values
+        assert sheet.pop.label == params.name
+
+        # test if self.pop.positions was called
 
 
     def test_init_sheet_call(self, mock_model, params):
@@ -459,8 +469,7 @@ class TestSheetWithMagnificationFactor:
 
     @pytest.fixture
     def mock_model(self):
-        model = MagicMock()
-        model.sim = MagicMock()
+        model = MagicMock(sim = MagicMock())
         
         yield model
 
@@ -546,8 +555,7 @@ class TestVisualCorticalUniformSheet:
 
     @pytest.fixture
     def mock_model(self):
-        model = MagicMock()
-        model.sim = MagicMock()
+        model = MagicMock(sim = pyNN.nest)
         
         yield model
 
@@ -557,8 +565,8 @@ class TestVisualCorticalUniformSheet:
         yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
 
 
-    @pytest.fixture(params=[(1.2, 2.1, 3, 6), (4., .5, 6, 5)]) # (magnification_factor, sx, sy, density)
-    def params(self, request, base_params):
+    @pytest.fixture(params=[(1.0, 10000, 2000, 4), (1.2, 20000, 500, 6)]) # (magnification_factor, sx, sy, density)
+    def params(self, request, base_params): # fails for smaller values (1.0, 80, 90, 3), (1, 60, 50, 6), (1, 180, 45, 5)])
         args = request.param
         base_params['magnification_factor'], base_params['sx'], base_params['sy'], base_params['density'] = args[0], args[1], args[2], args[3]
 
@@ -573,7 +581,19 @@ class TestVisualCorticalUniformSheet:
     # INIT
 
     def test_init_assertions(self, init_sheet):
-        pass # check sheet.pop
+        sheet, params = init_sheet
+        
+        assert isinstance(sheet.pop, pyNN.nest.Population)
+        # assert sheet.pop... == int(parameters.sx * parameters.sy * parameters.density)
+        # assert sheet.pop... == getattr(sheet.model.sim, params.cell.model)
+        # assert sheet.pop...params? == params.cell.params
+        # assert isinstance(sheet.pop.structure, space.RandomStructure)
+        # assert sheet.pop.structure.boundary == space.Cuboid(params.sx, params.sy, 0)
+        # assert sheet.pop.structure... == !!!
+        # assert sheet.pop.initial_values == params.cell.initial_values
+        # assert sheet.pop.label == params.name
+
+        # test if self.pop.positions was called
 
 
     def test_init_sheet_w_mag_factor_call(self, mock_model, params):
@@ -596,8 +616,7 @@ class TestVisualCorticalUniformSheet3D:
 
     @pytest.fixture
     def mock_model(self):
-        model = MagicMock()
-        model.sim = MagicMock()
+        model = MagicMock(sim = pyNN.nest)
         
         yield model
 
@@ -607,8 +626,8 @@ class TestVisualCorticalUniformSheet3D:
         yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
 
 
-    @pytest.fixture(params=[(1.2, 2.1, 3, 6, 3, 3), (4., .5, 6, 5, 5, 10)]) # (magnification_factor, sx, sy, density, min_depth, max_depth) What happens if min_depth > max depth
-    def params(self, request, base_params):
+    @pytest.fixture(params=[(1.0, 10000, 2000, 4, 3, 3), (1.2, 20000, 500, 6, 5, 10)]) # (magnification_factor, sx, sy, density, min_depth, max_depth) What happens if min_depth > max depth
+    def params(self, request, base_params): # fails for smaller values (1.2, 2.1, 3, 6, 3, 3), (4., .5, 6, 5, 5, 10)]) 
         args = request.param
         base_params['magnification_factor'], base_params['sx'], base_params['sy'], base_params['density'] = args[0], args[1], args[2], args[3]
         base_params['min_depth'], base_params['max_depth'] = args[4], args[5]
@@ -623,8 +642,20 @@ class TestVisualCorticalUniformSheet3D:
 
     # INIT
 
-    def test_init_assertions(self, init_sheet): # specific pro 3D
-        pass # check sheet.pop
+    def test_init_assertions(self, init_sheet): # specific for 3D
+        sheet, params = init_sheet
+        
+        assert isinstance(sheet.pop, pyNN.nest.Population)
+        # assert sheet.pop... == int(parameters.sx * parameters.sy * parameters.density)
+        # assert sheet.pop... == getattr(sheet.model.sim, params.cell.model)
+        # assert sheet.pop...params? == params.cell.params
+        # assert isinstance(sheet.pop.structure, space.RandomStructure)
+        # assert sheet.pop.structure.boundary == space.Cuboid(params.sx, params.sy, 0)
+        # assert sheet.pop.structure... == !!!
+        # assert sheet.pop.initial_values == params.cell.initial_values
+        # assert sheet.pop.label == params.name
+
+        # test if self.pop.positions was called
 
 
     def test_init_sheet_w_mag_factor_call(self, mock_model, params):
@@ -637,4 +668,3 @@ class TestVisualCorticalUniformSheet3D:
         with patch.object(SheetWithMagnificationFactor, '__init__', side_effect=set_vals) as mock_parent_call:
             sheet = VisualCorticalUniformSheet3D(mock_model, params)
             mock_parent_call.assert_called_once_with(sheet, mock_model, params)
-    
