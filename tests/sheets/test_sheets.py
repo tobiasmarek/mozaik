@@ -16,29 +16,32 @@ from unittest.mock import patch
 from unittest.mock import call
 
 
+
+@pytest.fixture
+def mock_model():
+    model = MagicMock(sim = pyNN.nest)
+    model.sim.state = MagicMock(dt = MagicMock())
+    
+    yield model
+
+
+@pytest.fixture(scope="module", params=["sheet_0", "sheet_1"])
+def params(request):
+    yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
+
+
+
+
 from mozaik.sheets import Sheet
 
 class TestSheet():
-
-    @pytest.fixture
-    def mock_model(self):
-        model = MagicMock(sim = MagicMock())
-        model.sim.state = MagicMock(dt = 0.1)
-        
-        yield model
-
-    
-    @pytest.fixture(scope="function", params=["sheet_0", "sheet_1"])
-    def params(self, request):
-        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
-
 
     @pytest.fixture
     def init_sheet(self, mock_model, params):
         yield Sheet(mock_model, None, None, params), params # instead of None, parametrize sx, sy
 
 
-    # __INIT__    
+    # __INIT__ 
 
     def test_init_assertions(self, init_sheet, mock_model):
         sheet, params = init_sheet
@@ -98,8 +101,7 @@ class TestSheet():
     def _pop_mock(self, request):
         all_cells = request.param
 
-        _pop_mock = MagicMock()
-        _pop_mock.all_cells = all_cells
+        _pop_mock = MagicMock(all_cells = all_cells)
         _pop_mock.record = MagicMock()
         _pop_mock.__getitem__.return_value = MagicMock(record = None)
         _pop_mock.__len__.return_value = len(all_cells)
@@ -395,36 +397,25 @@ class TestSheet():
 
 
 
+
 from mozaik.sheets.vision import RetinalUniformSheet
 
 class TestRetinalUniformSheet:
 
-    @pytest.fixture
-    def mock_model(self):
-        model = MagicMock(sim = pyNN.nest)
-        
-        yield model
-
-    
-    @pytest.fixture(scope="function", params=["sheet_0", "sheet_1"])
-    def base_params(self, request):
-        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
-
-
     @pytest.fixture(params=[(11.2, 20.1, 3), (14.0, 5.5, 6)])
-    def params(self, request, base_params):
+    def _params(self, request, params):
         args = request.param
-        base_params['sx'], base_params['sy'], base_params['density'] = args[0], args[1], args[2]
+        params['sx'], params['sy'], params['density'] = args[0], args[1], args[2]
 
-        yield base_params
+        yield params
 
 
     @pytest.fixture
-    def init_sheet(self, mock_model, params):
-        yield RetinalUniformSheet(mock_model, params), params
+    def init_sheet(self, mock_model, _params):
+        yield RetinalUniformSheet(mock_model, _params), _params
 
 
-    # INIT
+    # __INIT__
 
     def test_init_assertions(self, init_sheet):
         sheet, params = init_sheet
@@ -442,7 +433,9 @@ class TestRetinalUniformSheet:
         # test if self.pop.positions was called
 
 
-    def test_init_sheet_call(self, mock_model, params):
+    def test_init_sheet_call(self, mock_model, _params):
+        params = _params
+
         def set_vals(sheet, mock_model, sx, sy, params):
             sheet.model = mock_model
             sheet.sim, sheet.parameters, sheet.name = sheet.model.sim, params, params.name
@@ -467,33 +460,21 @@ from mozaik.sheets.vision import SheetWithMagnificationFactor
 
 class TestSheetWithMagnificationFactor:
 
-    @pytest.fixture
-    def mock_model(self):
-        model = MagicMock(sim = MagicMock())
-        
-        yield model
-
-    
-    @pytest.fixture(scope="function", params=["sheet_0", "sheet_1"])
-    def base_params(self, request):
-        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
-
-
     @pytest.fixture(params=[(1.2, 2.1, 3), (4., .5, 6)]) # (magnification_factor, sx, sy) DENSITY MISSING!
-    def params(self, request, base_params):
+    def params(self, request, params):
         args = request.param
-        base_params['magnification_factor'], base_params['sx'], base_params['sy'] = args[0], args[1], args[2]
-        # base_params['density'] = 0.5
+        params['magnification_factor'], params['sx'], params['sy'] = args[0], args[1], args[2]
+        # params['density'] = 0.5
 
-        yield base_params
+        yield params
 
 
     @pytest.fixture
-    def init_sheet(self, mock_model, params):
-        yield SheetWithMagnificationFactor(mock_model, params), params
+    def init_sheet(self, mock_model, _params):
+        yield SheetWithMagnificationFactor(mock_model, _params), _params
 
 
-    # INIT
+    # __INIT__
 
     def test_init_assertions(self, init_sheet):
         sheet, params = init_sheet
@@ -501,7 +482,8 @@ class TestSheetWithMagnificationFactor:
         assert sheet.magnification_factor == params.magnification_factor
 
 
-    def test_init_sheet_call(self, mock_model, params):
+    def test_init_sheet_call(self, mock_model, _params):
+        params = _params
         mag = params.magnification_factor
 
         with patch.object(Sheet, '__init__') as mock_parent_call:
@@ -553,32 +535,20 @@ from mozaik.sheets.vision import VisualCorticalUniformSheet
 
 class TestVisualCorticalUniformSheet:
 
-    @pytest.fixture
-    def mock_model(self):
-        model = MagicMock(sim = pyNN.nest)
-        
-        yield model
-
-    
-    @pytest.fixture(scope="function", params=["sheet_0", "sheet_1"])
-    def base_params(self, request):
-        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
-
-
     @pytest.fixture(params=[(1.0, 10000, 2000, 4), (1.2, 20000, 500, 6)]) # (magnification_factor, sx, sy, density)
-    def params(self, request, base_params): # fails for smaller values (1.0, 80, 90, 3), (1, 60, 50, 6), (1, 180, 45, 5)])
+    def _params(self, request, params): # fails for smaller values (1.0, 80, 90, 3), (1, 60, 50, 6), (1, 180, 45, 5)])
         args = request.param
-        base_params['magnification_factor'], base_params['sx'], base_params['sy'], base_params['density'] = args[0], args[1], args[2], args[3]
+        params['magnification_factor'], params['sx'], params['sy'], params['density'] = args[0], args[1], args[2], args[3]
 
-        yield base_params
+        yield params
 
 
     @pytest.fixture
-    def init_sheet(self, mock_model, params):
-        yield VisualCorticalUniformSheet(mock_model, params), params
+    def init_sheet(self, mock_model, _params):
+        yield VisualCorticalUniformSheet(mock_model, _params), _params
 
 
-    # INIT
+    # __INIT__
 
     def test_init_assertions(self, init_sheet):
         sheet, params = init_sheet
@@ -596,7 +566,9 @@ class TestVisualCorticalUniformSheet:
         # test if self.pop.positions was called
 
 
-    def test_init_sheet_w_mag_factor_call(self, mock_model, params):
+    def test_init_sheet_w_mag_factor_call(self, mock_model, _params):
+        params = _params
+        
         def set_vals(sheet, mock_model, params):
             sheet.model = mock_model
             sheet.sim, sheet.parameters, sheet.name = sheet.model.sim, params, params.name
@@ -614,35 +586,23 @@ from mozaik.sheets.vision import VisualCorticalUniformSheet3D
 
 class TestVisualCorticalUniformSheet3D:
 
-    @pytest.fixture
-    def mock_model(self):
-        model = MagicMock(sim = pyNN.nest)
-        
-        yield model
-
-    
-    @pytest.fixture(scope="function", params=["sheet_0", "sheet_1"])
-    def base_params(self, request):
-        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
-
-
     @pytest.fixture(params=[(1.0, 10000, 2000, 4, 3, 3), (1.2, 20000, 500, 6, 5, 10)]) # (magnification_factor, sx, sy, density, min_depth, max_depth) What happens if min_depth > max depth
-    def params(self, request, base_params): # fails for smaller values (1.2, 2.1, 3, 6, 3, 3), (4., .5, 6, 5, 5, 10)]) 
+    def _params(self, request, params): # fails for smaller values (1.2, 2.1, 3, 6, 3, 3), (4., .5, 6, 5, 5, 10)]) 
         args = request.param
-        base_params['magnification_factor'], base_params['sx'], base_params['sy'], base_params['density'] = args[0], args[1], args[2], args[3]
-        base_params['min_depth'], base_params['max_depth'] = args[4], args[5]
+        params['magnification_factor'], params['sx'], params['sy'], params['density'] = args[0], args[1], args[2], args[3]
+        params['min_depth'], params['max_depth'] = args[4], args[5]
 
-        yield base_params
+        yield params
 
 
     @pytest.fixture
-    def init_sheet(self, mock_model, params):
-        yield VisualCorticalUniformSheet3D(mock_model, params), params
+    def init_sheet(self, mock_model, _params):
+        yield VisualCorticalUniformSheet3D(mock_model, _params), _params
 
 
-    # INIT
+    # __INIT__
 
-    def test_init_assertions(self, init_sheet): # specific for 3D
+    def test_init_assertions(self, init_sheet):
         sheet, params = init_sheet
         
         assert isinstance(sheet.pop, pyNN.nest.Population)
@@ -658,7 +618,9 @@ class TestVisualCorticalUniformSheet3D:
         # test if self.pop.positions was called
 
 
-    def test_init_sheet_w_mag_factor_call(self, mock_model, params):
+    def test_init_sheet_w_mag_factor_call(self, mock_model, _params):
+        params = _params
+        
         def set_vals(sheet, mock_model, params):
             sheet.model = mock_model
             sheet.sim, sheet.parameters, sheet.name = sheet.model.sim, params, params.name
