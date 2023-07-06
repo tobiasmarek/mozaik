@@ -153,6 +153,9 @@ class TestSheet():
             
             _neuron_annotations.append(ord_dict)
         
+        if width == 0:
+            print(_neuron_annotations)
+        
         yield _pop_mock, _neuron_annotations
 
 
@@ -180,41 +183,37 @@ class TestSheet():
         _pop_mock, _neuron_annotations = _pop_mock_and_neuron_annotations
         sheet.pop, sheet._neuron_annotations = _pop_mock, _neuron_annotations
 
+        i = len(_neuron_annotations)//2
+        key = "_"
+
         match request.param:
             case "normal":
-                i = len(_neuron_annotations)//2
                 keys = list(_neuron_annotations[i].keys())
-                key = "_"
                 if len(keys) != 0:
                     key = keys[0]
                 yield sheet, i, key, _neuron_annotations[i][key][1]
             case "upper_bound":
                 i = len(_neuron_annotations) - 1
                 keys = list(_neuron_annotations[i].keys())
-                key = "_"
                 if len(keys) != 0:
                     key = keys[0]
                 yield sheet, i, key, _neuron_annotations[i][key][1]
             case "lower_bound":
                 i = 0
                 keys = list(_neuron_annotations[i].keys())
-                key = "_"
                 if len(keys) != 0:
                     key = keys[0]
                 yield sheet, i, key, _neuron_annotations[i][key][1]
             case "protected":
-                i = len(_neuron_annotations)//2
                 keys = list(_neuron_annotations[i].keys())
-                key = "_"
                 if len(keys) != 0:
                     key = keys[0]
                 _neuron_annotations[i][key] = (True, _neuron_annotations[i][key][1])
-                yield sheet, i, key, "msg_protected"
+                yield sheet, i, key, "msg_protected" # how
             case "missing_key":
-                i = len(_neuron_annotations)//2
                 yield sheet, i, "non-existent_key", "msg_does_not_exist" 
             case "missing_neuron":
-                i = len(_neuron_annotations)
+                i = len(_neuron_annotations) # todo
                 yield sheet, i, "key", "msg_out_of_range"
 
 
@@ -229,7 +228,7 @@ class TestSheet():
     def test_get_neuron_annotation_pop_not_set(self, init_sheet):
         sheet, _ = init_sheet
         pass
-        # assert sheet.get_neuron_annotation(neuron_number, key) # logger Pop not have been set yet, but i get return value None or check error
+        # assert sheet.get_neuron_annotation(neuron_number, key) # logger Pop have not been set yet, but i get return value None or check error
 
 
     # GET_NEURON_ANNOTATIONS
@@ -261,14 +260,14 @@ class TestSheet():
 
     @pytest.mark.parametrize("template,render,result", [('default', lambda t, c: Template(t).safe_substitute(c), None), (None, lambda t, c: c, {'name': 'Sheet'})])
     def test_describe(self, init_sheet, template, render, result): # test more than just Sheet class
-        sheet, params = init_sheet
+        sheet, _ = init_sheet
 
         assert sheet.describe(template, render) == result
 
 
     # RECORD
     
-    @pytest.mark.parametrize("all_keys, not_all_keys", [(['key_0', 'key_1', 'key_3'], ['key_2', 'key_4'])]) # add more
+    @pytest.mark.parametrize("all_keys, not_all_keys", [(['key_0', 'key_1', 'key_3'], ['key_2', 'key_4']), ([], []), ([], ['key_0']), (['key_0'], [])])
     def test_record(self, init_sheet, _pop_mock, all_keys, not_all_keys):
         sheet, params = init_sheet
         sheet.pop = _pop_mock    
@@ -393,7 +392,7 @@ class TestSheet():
 
 
     def test_setup_initial_values_pine(self, init_sheet):
-        pass # pyNN population with initialize a set
+        pass # pyNN population with initialize() and set()
 
 
 
@@ -461,7 +460,7 @@ from mozaik.sheets.vision import SheetWithMagnificationFactor
 class TestSheetWithMagnificationFactor:
 
     @pytest.fixture(params=[(1.2, 2.1, 3), (4., .5, 6)]) # (magnification_factor, sx, sy) DENSITY MISSING!
-    def params(self, request, params):
+    def _params(self, request, params):
         args = request.param
         params['magnification_factor'], params['sx'], params['sy'] = args[0], args[1], args[2]
         # params['density'] = 0.5
