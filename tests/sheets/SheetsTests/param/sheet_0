@@ -1,5 +1,9 @@
 {
 
+    'sx' : 200 
+    'sy' : 100
+    'density' : 250
+
     'cell': {
 
         'model': 'EIF_cond_exp_isfa_ista',

@@ -38,7 +38,7 @@ class TestSheet():
 
     @pytest.fixture(scope="class")
     def init_sheet(self, mock_model, params):
-        yield Sheet(mock_model, None, None, params), params # instead of None, parametrize sx, sy
+        yield Sheet(mock_model, params.sx, params.sy, params), params
 
 
     # __INIT__ 
@@ -46,7 +46,7 @@ class TestSheet():
     def test_init_assertions(self, init_sheet, mock_model):
         sheet, params = init_sheet
 
-        expected_values = np.array([mock_model.sim, mock_model.sim.state.dt, params.name, "", None, None, None, 0])
+        expected_values = np.array([mock_model.sim, mock_model.sim.state.dt, params.name, "", None, params.sx, params.sy, 0])
         actual_values = np.array([sheet.sim, sheet.dt, sheet.name, "", sheet._pop, sheet.size_x, sheet.size_y, sheet.msc])
 
         assert np.array_equal(expected_values, actual_values)
@@ -389,17 +389,9 @@ from mozaik.sheets.vision import RetinalUniformSheet
 
 class TestRetinalUniformSheet:
 
-    @pytest.fixture(scope="class", params=[(11.2, 20.1, 3), (14.0, 5.5, 6)])
-    def _params(self, request, params):
-        args = request.param
-        params['sx'], params['sy'], params['density'] = args[0], args[1], args[2]
-
-        yield params
-
-
     @pytest.fixture(scope="class")
-    def init_sheet(self, mock_model, _params):
-        yield RetinalUniformSheet(mock_model, _params), _params
+    def init_sheet(self, mock_model, params):
+        yield RetinalUniformSheet(mock_model, params), params
 
 
     # __INIT__
@@ -420,9 +412,7 @@ class TestRetinalUniformSheet:
         # test if self.pop.positions was called
 
 
-    def test_init_sheet_call(self, mock_model, _params):
-        params = _params
-
+    def test_init_sheet_call(self, mock_model, params):
         def set_vals(sheet, mock_model, sx, sy, params):
             sheet.model = mock_model
             sheet.sim, sheet.parameters, sheet.name = sheet.model.sim, params, params.name
@@ -447,16 +437,14 @@ from mozaik.sheets.vision import SheetWithMagnificationFactor
 
 class TestSheetWithMagnificationFactor:
 
-    @pytest.fixture(scope="class", params=[(1.2, 2.1, 3), (4., .5, 6)]) # (magnification_factor, sx, sy) DENSITY MISSING!
+    @pytest.fixture(scope="class", params=[1.2, 2.1, 4., .5])
     def _params(self, request, params):
-        args = request.param
-        params['magnification_factor'], params['sx'], params['sy'] = args[0], args[1], args[2]
-        # params['density'] = 0.5
+        params['magnification_factor'] = request.param
 
         yield params
 
 
-    @pytest.fixture(scope="class")
+    @pytest.fixture(scope="class") # (magnification_factor, sx, sy) DENSITY MISSING in required parameters
     def init_sheet(self, mock_model, _params):
         yield SheetWithMagnificationFactor(mock_model, _params), _params
 
@@ -522,15 +510,14 @@ from mozaik.sheets.vision import VisualCorticalUniformSheet
 
 class TestVisualCorticalUniformSheet:
 
-    @pytest.fixture(scope="class", params=[(1.0, 10000, 2000, 4), (1.2, 20000, 500, 6)]) # (magnification_factor, sx, sy, density)
+    @pytest.fixture(scope="class", params=[1.0, 4, 1.2])
     def _params(self, request, params): # fails for smaller values (1.0, 80, 90, 3), (1, 60, 50, 6), (1, 180, 45, 5)])
-        args = request.param
-        params['magnification_factor'], params['sx'], params['sy'], params['density'] = args[0], args[1], args[2], args[3]
+        params['magnification_factor'] = request.param
 
         yield params
 
 
-    @pytest.fixture(scope="class")
+    @pytest.fixture(scope="class") # (magnification_factor, sx, sy, density)
     def init_sheet(self, mock_model, _params):
         yield VisualCorticalUniformSheet(mock_model, _params), _params
 
@@ -573,16 +560,15 @@ from mozaik.sheets.vision import VisualCorticalUniformSheet3D
 
 class TestVisualCorticalUniformSheet3D:
 
-    @pytest.fixture(scope="class", params=[(1.0, 10000, 2000, 4, 3, 3), (1.2, 20000, 500, 6, 5, 10)]) # (magnification_factor, sx, sy, density, min_depth, max_depth) What happens if min_depth > max depth
+    @pytest.fixture(scope="class", params=[(1.0, 3, 3), (1.2, 5, 10), (1.5, 4, 6)]) #(1.0, 10000, 2000, 4, 3, 3), (1.2, 20000, 500, 6, 5, 10)]) What happens if min_depth > max depth
     def _params(self, request, params): # fails for smaller values (1.2, 2.1, 3, 6, 3, 3), (4., .5, 6, 5, 5, 10)]) 
         args = request.param
-        params['magnification_factor'], params['sx'], params['sy'], params['density'] = args[0], args[1], args[2], args[3]
-        params['min_depth'], params['max_depth'] = args[4], args[5]
-
+        params['magnification_factor'], params['min_depth'], params['max_depth'] = args[0], args[1], args[2]
+        
         yield params
 
 
-    @pytest.fixture(scope="class")
+    @pytest.fixture(scope="class") # (magnification_factor, sx, sy, density, min_depth, max_depth)
     def init_sheet(self, mock_model, _params):
         yield VisualCorticalUniformSheet3D(mock_model, _params), _params
 
