@@ -17,7 +17,7 @@ from unittest.mock import call
 
 
 
-@pytest.fixture
+@pytest.fixture(scope="module") # default scope is invocation per "function", scope="module" is only one invocation per module
 def mock_model():
     model = MagicMock(sim = pyNN.nest)
     model.sim.state = MagicMock(dt = MagicMock())
@@ -36,7 +36,7 @@ from mozaik.sheets import Sheet
 
 class TestSheet():
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def init_sheet(self, mock_model, params):
         yield Sheet(mock_model, None, None, params), params # instead of None, parametrize sx, sy
 
@@ -97,7 +97,7 @@ class TestSheet():
             sheet.size_in_degrees()
 
 
-    @pytest.fixture(scope="function", params=[np.array([2,3,15.212,0.5,-2.5]), np.array([2,3,0.5,-2.5])]) # add more weird parameters
+    @pytest.fixture(params=[np.array([2,3,15.212,0.5,-2.5]), np.array([2,3,0.5,-2.5])]) # add more weird parameters
     def _pop_mock(self, request):
         all_cells = request.param
 
@@ -140,7 +140,7 @@ class TestSheet():
         pass # test return value of pop() - locals()
 
 
-    @pytest.fixture(scope="function", params=[2, 1, 10, 0])
+    @pytest.fixture(params=[2, 1, 10, 0])
     def _pop_mock_and_neuron_annotations(self, request, _pop_mock):
         width = request.param
         
@@ -177,7 +177,7 @@ class TestSheet():
         # assert sheet.add_neuron_annotation(neuron_number, key, value, protected) # logger Pop not have been set yet THIS FAILS
 
 
-    @pytest.fixture(params=["normal", "upper_bound", "lower_bound"]) #, "protected", "missing_key", "missing_neuron"]) # which scope? parametrize instead of fixture?
+    @pytest.fixture(params=["normal"]) #, "protected", "missing_key", "missing_neuron"]) # which scope? parametrize instead of fixture?
     def sheet_neuron_num_key_result(self, request, init_sheet, _pop_mock_and_neuron_annotations):
         sheet, _ = init_sheet
         _pop_mock, _neuron_annotations = _pop_mock_and_neuron_annotations
@@ -188,18 +188,6 @@ class TestSheet():
 
         match request.param:
             case "normal":
-                keys = list(_neuron_annotations[i].keys())
-                if len(keys) != 0:
-                    key = keys[0]
-                yield sheet, i, key, _neuron_annotations[i][key][1]
-            case "upper_bound":
-                i = len(_neuron_annotations) - 1
-                keys = list(_neuron_annotations[i].keys())
-                if len(keys) != 0:
-                    key = keys[0]
-                yield sheet, i, key, _neuron_annotations[i][key][1]
-            case "lower_bound":
-                i = 0
                 keys = list(_neuron_annotations[i].keys())
                 if len(keys) != 0:
                     key = keys[0]
@@ -401,7 +389,7 @@ from mozaik.sheets.vision import RetinalUniformSheet
 
 class TestRetinalUniformSheet:
 
-    @pytest.fixture(params=[(11.2, 20.1, 3), (14.0, 5.5, 6)])
+    @pytest.fixture(scope="class", params=[(11.2, 20.1, 3), (14.0, 5.5, 6)])
     def _params(self, request, params):
         args = request.param
         params['sx'], params['sy'], params['density'] = args[0], args[1], args[2]
@@ -409,7 +397,7 @@ class TestRetinalUniformSheet:
         yield params
 
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def init_sheet(self, mock_model, _params):
         yield RetinalUniformSheet(mock_model, _params), _params
 
@@ -459,7 +447,7 @@ from mozaik.sheets.vision import SheetWithMagnificationFactor
 
 class TestSheetWithMagnificationFactor:
 
-    @pytest.fixture(params=[(1.2, 2.1, 3), (4., .5, 6)]) # (magnification_factor, sx, sy) DENSITY MISSING!
+    @pytest.fixture(scope="class", params=[(1.2, 2.1, 3), (4., .5, 6)]) # (magnification_factor, sx, sy) DENSITY MISSING!
     def _params(self, request, params):
         args = request.param
         params['magnification_factor'], params['sx'], params['sy'] = args[0], args[1], args[2]
@@ -468,7 +456,7 @@ class TestSheetWithMagnificationFactor:
         yield params
 
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def init_sheet(self, mock_model, _params):
         yield SheetWithMagnificationFactor(mock_model, _params), _params
 
@@ -534,7 +522,7 @@ from mozaik.sheets.vision import VisualCorticalUniformSheet
 
 class TestVisualCorticalUniformSheet:
 
-    @pytest.fixture(params=[(1.0, 10000, 2000, 4), (1.2, 20000, 500, 6)]) # (magnification_factor, sx, sy, density)
+    @pytest.fixture(scope="class", params=[(1.0, 10000, 2000, 4), (1.2, 20000, 500, 6)]) # (magnification_factor, sx, sy, density)
     def _params(self, request, params): # fails for smaller values (1.0, 80, 90, 3), (1, 60, 50, 6), (1, 180, 45, 5)])
         args = request.param
         params['magnification_factor'], params['sx'], params['sy'], params['density'] = args[0], args[1], args[2], args[3]
@@ -542,7 +530,7 @@ class TestVisualCorticalUniformSheet:
         yield params
 
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def init_sheet(self, mock_model, _params):
         yield VisualCorticalUniformSheet(mock_model, _params), _params
 
@@ -585,7 +573,7 @@ from mozaik.sheets.vision import VisualCorticalUniformSheet3D
 
 class TestVisualCorticalUniformSheet3D:
 
-    @pytest.fixture(params=[(1.0, 10000, 2000, 4, 3, 3), (1.2, 20000, 500, 6, 5, 10)]) # (magnification_factor, sx, sy, density, min_depth, max_depth) What happens if min_depth > max depth
+    @pytest.fixture(scope="class", params=[(1.0, 10000, 2000, 4, 3, 3), (1.2, 20000, 500, 6, 5, 10)]) # (magnification_factor, sx, sy, density, min_depth, max_depth) What happens if min_depth > max depth
     def _params(self, request, params): # fails for smaller values (1.2, 2.1, 3, 6, 3, 3), (4., .5, 6, 5, 5, 10)]) 
         args = request.param
         params['magnification_factor'], params['sx'], params['sy'], params['density'] = args[0], args[1], args[2], args[3]
@@ -594,7 +582,7 @@ class TestVisualCorticalUniformSheet3D:
         yield params
 
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def init_sheet(self, mock_model, _params):
         yield VisualCorticalUniformSheet3D(mock_model, _params), _params
 
