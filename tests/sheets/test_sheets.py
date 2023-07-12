@@ -17,17 +17,16 @@ from unittest.mock import call
 
 
 
-@pytest.fixture(scope="module") # default scope is invocation per "function", scope="module" is only one invocation per module
+@pytest.fixture(scope="module")
 def mock_model():
+    """
+    Mocking the Model class to separate the testing of Sheets and the Model itself.
+    Scope being equal to module means creating the mocked object only once per module.
+    """
     model = MagicMock(sim = pyNN.nest)
     model.sim.state = MagicMock(dt = MagicMock())
     
     yield model
-
-
-@pytest.fixture(scope="module", params=["sheet_0", "sheet_1"])
-def params(request):
-    yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
 
 
 
@@ -36,9 +35,15 @@ from mozaik.sheets import Sheet
 
 class TestSheet():
 
+    @pytest.fixture(scope="class", params=["sheet_0", "sheet_1"])
+    def params(self, request):
+        print(f"SheetsTests/param/{request.param}")
+        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
+
+
     @pytest.fixture(scope="class")
     def init_sheet(self, mock_model, params):
-        yield Sheet(mock_model, params.sx, params.sy, params), params
+        yield Sheet(mock_model, None, None, params), params # None, None because Sheet constructor does not require sx nor sy
 
 
     # __INIT__ 
@@ -46,8 +51,8 @@ class TestSheet():
     def test_init_assertions(self, init_sheet, mock_model):
         sheet, params = init_sheet
 
-        expected_values = np.array([mock_model.sim, mock_model.sim.state.dt, params.name, "", None, params.sx, params.sy, 0])
-        actual_values = np.array([sheet.sim, sheet.dt, sheet.name, "", sheet._pop, sheet.size_x, sheet.size_y, sheet.msc])
+        expected_values = np.array([mock_model.sim, mock_model.sim.state.dt, params.name, None, None, None, 0])
+        actual_values = np.array([sheet.sim, sheet.dt, sheet.name, sheet._pop, sheet.size_x, sheet.size_y, sheet.msc])
 
         assert np.array_equal(expected_values, actual_values)
 
@@ -76,15 +81,22 @@ class TestSheet():
 
     # SETUP_TO_RECORD_LIST
 
-    def test_setup_to_record_list(self, init_sheet):
+    def test_setup_to_record_list(self, init_sheet, _pop_mock):
         sheet, params = init_sheet
+        sheet._pop, sheet.pop = None, _pop_mock
 
-        sheet.setup_to_record_list() # fails if recorders are None, has to be {} - a ParameterSet
+        mozaik.setup_mpi() # Initialize mozaik.rng for shuffling
+        sheet.setup_to_record_list()
 
         if params.recorders == {}:
             assert len(sheet.to_record) == 0
         else:
-            assert len(sheet.to_record) == len(sheet.params.recorders)
+            unique_variables = {}
+            for recorder in params.recorders:
+                for var in params.recorders[recorder].variables:
+                    unique_variables[var] = True
+
+            assert len(sheet.to_record) == len(unique_variables)
             # more tests
 
 
@@ -115,7 +127,7 @@ class TestSheet():
         sheet, _ = init_sheet
 
         with patch.object(sheet, 'setup_artificial_stimulation') as mock_arti_stim, patch.object(sheet, 'setup_initial_values') as mock_init_val:
-            sheet.pop = _pop_mock
+            sheet._pop, sheet.pop = None, _pop_mock
             mock_arti_stim.assert_called_once()
             mock_init_val.assert_called_once()
 
@@ -124,13 +136,14 @@ class TestSheet():
     
     def test_pop_not_set(self, init_sheet):
         sheet, _ = init_sheet
+        sheet._pop = None
 
         assert sheet.pop == None
 
     
     def test_pop_set_again(self, init_sheet, _pop_mock):
         sheet, _ = init_sheet
-        sheet.pop = _pop_mock
+        sheet._pop, sheet.pop = None, _pop_mock
 
         with pytest.raises(Exception):
             sheet.pop = "set_value_again"      
@@ -164,9 +177,12 @@ class TestSheet():
     @pytest.mark.parametrize("neuron_number,key,value,protected", [(1,"annotation_name", "annotation", False), (2,"annotation_name", "annotation", True)])
     def test_add_neuron_annotation_assign(self, init_sheet, _pop_mock_and_neuron_annotations, neuron_number, key, value, protected):
         sheet, _ = init_sheet
+        sheet._pop = None
         sheet.pop, sheet._neuron_annotations = _pop_mock_and_neuron_annotations
 
         sheet.add_neuron_annotation(neuron_number, key, value, protected) # if neuron_number or key is missing -> KeyError
+
+        # check adding to a protected value / changing a value
 
         assert sheet._neuron_annotations[neuron_number][key] == (protected, value) # or logger Annotation protected
 
@@ -177,40 +193,43 @@ class TestSheet():
         # assert sheet.add_neuron_annotation(neuron_number, key, value, protected) # logger Pop not have been set yet THIS FAILS
 
 
-    @pytest.fixture(params=["normal"]) #, "protected", "missing_key", "missing_neuron"]) # which scope? parametrize instead of fixture?
-    def sheet_neuron_num_key_result(self, request, init_sheet, _pop_mock_and_neuron_annotations):
-        sheet, _ = init_sheet
-        _pop_mock, _neuron_annotations = _pop_mock_and_neuron_annotations
-        sheet.pop, sheet._neuron_annotations = _pop_mock, _neuron_annotations
-
-        i = len(_neuron_annotations)//2
-        key = "_"
-
-        match request.param:
-            case "normal":
-                keys = list(_neuron_annotations[i].keys())
-                if len(keys) != 0:
-                    key = keys[0]
-                yield sheet, i, key, _neuron_annotations[i][key][1]
-            case "protected":
-                keys = list(_neuron_annotations[i].keys())
-                if len(keys) != 0:
-                    key = keys[0]
-                _neuron_annotations[i][key] = (True, _neuron_annotations[i][key][1])
-                yield sheet, i, key, "msg_protected" # how
-            case "missing_key":
-                yield sheet, i, "non-existent_key", "msg_does_not_exist" 
-            case "missing_neuron":
-                i = len(_neuron_annotations) # todo
-                yield sheet, i, "key", "msg_out_of_range"
-
-
     # GET_NEURON_ANNOTATION
 
-    def test_get_neuron_annotation_value(self, sheet_neuron_num_key_result):
-        sheet, neuron_number, key, result = sheet_neuron_num_key_result
+    @pytest.mark.parametrize("action", ["normal"]) #, "protected", "missing_key", "missing_neuron"])
+    def test_get_neuron_annotation_value(self, init_sheet, _pop_mock_and_neuron_annotations, action):
+        sheet, _ = init_sheet
+        _pop_mock, _neuron_annotations = _pop_mock_and_neuron_annotations
+        sheet._pop, sheet.pop, sheet._neuron_annotations = None, _pop_mock, _neuron_annotations
 
-        assert sheet.get_neuron_annotation(neuron_number, key) == result # check error msg logger smh
+        neuron_number = len(_neuron_annotations)//2
+        key = "_"
+
+        match action:
+            case "normal":
+                keys = list(_neuron_annotations[neuron_number].keys())
+                if len(keys) == 0:
+                    return
+                key = keys[0]
+                
+                assert sheet.get_neuron_annotation(neuron_number, key) == _neuron_annotations[neuron_number][key][1]
+            
+            case "protected":
+                keys = list(_neuron_annotations[neuron_number].keys())
+                if len(keys) == 0:
+                    return
+                key = keys[0]
+                _neuron_annotations[neuron_number][key] = (True, _neuron_annotations[neuron_number][key][1])
+
+                assert sheet.get_neuron_annotation(neuron_number, key) == None # msg_protected
+
+            case "missing_key":
+                assert sheet.get_neuron_annotation(neuron_number, "non-existent_key") == None # msg_does_not_exist
+
+            case "missing_neuron":
+                neuron_number = len(_neuron_annotations)
+                assert sheet.get_neuron_annotation(neuron_number, "key") == None # msg_out_of_range
+            
+            # check error msg logger smh
 
     
     def test_get_neuron_annotation_pop_not_set(self, init_sheet):
@@ -223,6 +242,7 @@ class TestSheet():
 
     def test_get_neuron_annotations_list(self, init_sheet, _pop_mock_and_neuron_annotations):
         sheet, _ = init_sheet
+        sheet._pop = None
         sheet.pop, _neuron_annotations = _pop_mock_and_neuron_annotations
         sheet._neuron_annotations = _neuron_annotations
 
@@ -258,7 +278,7 @@ class TestSheet():
     @pytest.mark.parametrize("all_keys, not_all_keys", [(['key_0', 'key_1', 'key_3'], ['key_2', 'key_4']), ([], []), ([], ['key_0']), (['key_0'], [])])
     def test_record(self, init_sheet, _pop_mock, all_keys, not_all_keys):
         sheet, params = init_sheet
-        sheet.pop = _pop_mock    
+        sheet._pop, sheet.pop = None, _pop_mock    
         
         ord_dict, expected_all_calls, expected_not_all_calls = OrderedDict(), [], []
         for key in all_keys:
@@ -287,7 +307,7 @@ class TestSheet():
         block_mock = MagicMock(segments = [segment])
         _pop_mock.get_data = block_mock
 
-        sheet.pop = _pop_mock
+        sheet._pop, sheet.pop = None, _pop_mock
 
         new_segment = sheet.get_data(stimulus_duration)
         print(new_segment.annotations["sheet_name"])
@@ -299,7 +319,7 @@ class TestSheet():
     
     def test_get_data_call(self, init_sheet, _pop_mock):
         sheet, _ = init_sheet
-        sheet.pop = _pop_mock
+        sheet._pop, sheet.pop = None, _pop_mock
         
         with patch.object(_pop_mock, 'get_data') as mock_get_data:
             sheet.get_data()
@@ -308,6 +328,7 @@ class TestSheet():
 
     def test_get_data_pop_not_set(self, init_sheet):
         sheet, _ = init_sheet
+        sheet._pop = None
 
         with pytest.raises(Exception): # be more specific because -> NameError: name 'errmsg' is not defined
             sheet.get_data()
@@ -317,8 +338,8 @@ class TestSheet():
         sheet, _ = init_sheet
 
         _pop_mock.get_data = MagicMock(side_effect = NothingToWriteError("error_msg"))
-        sheet.pop = _pop_mock
-        logger = MagicMock(degub = None)
+        sheet._pop, sheet.pop = None, _pop_mock
+        logger = MagicMock(debug = None)
 
         with patch.object(_pop_mock, 'get_data'), patch.object(logger, 'debug') as mock_debug:
             sheet.get_data()
@@ -341,7 +362,7 @@ class TestSheet():
     def test_prepare_artificial_stimulation(self, init_sheet, duration, offset, num_of_artificial_stim, num_of_additional_stim):
         sheet, _ = init_sheet
 
-        ds = MagicMock()
+        ds = MagicMock() # mocking stimulators
         sheet.artificial_stimulators = [ds for i in range(num_of_artificial_stim)]
         additional_stimulators = [ds for i in range(num_of_additional_stim)]
         total_calls = num_of_artificial_stim + num_of_additional_stim
@@ -371,7 +392,7 @@ class TestSheet():
 
     def test_setup_initial_values_calls(self, init_sheet, _pop_mock):
         sheet, params = init_sheet
-        sheet.pop = _pop_mock
+        sheet._pop, sheet.pop = None, _pop_mock
 
         with patch.object(_pop_mock, 'initialize') as mock_pop_init, patch.object(_pop_mock, 'set') as mock_pop_set:
             sheet.setup_initial_values()
@@ -388,6 +409,11 @@ class TestSheet():
 from mozaik.sheets.vision import RetinalUniformSheet
 
 class TestRetinalUniformSheet:
+
+    @pytest.fixture(scope="class", params=["retinal_sheet"])
+    def params(self, request):
+        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
+
 
     @pytest.fixture(scope="class")
     def init_sheet(self, mock_model, params):
@@ -437,16 +463,14 @@ from mozaik.sheets.vision import SheetWithMagnificationFactor
 
 class TestSheetWithMagnificationFactor:
 
-    @pytest.fixture(scope="class", params=[1.2, 2.1, 4., .5])
-    def _params(self, request, params):
-        params['magnification_factor'] = request.param
-
-        yield params
+    @pytest.fixture(scope="class", params=["sheet_w_mag_factor"])
+    def params(self, request):
+        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
 
 
     @pytest.fixture(scope="class") # (magnification_factor, sx, sy) DENSITY MISSING in required parameters
-    def init_sheet(self, mock_model, _params):
-        yield SheetWithMagnificationFactor(mock_model, _params), _params
+    def init_sheet(self, mock_model, params):
+        yield SheetWithMagnificationFactor(mock_model, params), params
 
 
     # __INIT__
@@ -457,8 +481,7 @@ class TestSheetWithMagnificationFactor:
         assert sheet.magnification_factor == params.magnification_factor
 
 
-    def test_init_sheet_call(self, mock_model, _params):
-        params = _params
+    def test_init_sheet_call(self, mock_model, params):
         mag = params.magnification_factor
 
         with patch.object(Sheet, '__init__') as mock_parent_call:
@@ -468,7 +491,7 @@ class TestSheetWithMagnificationFactor:
 
     # VF_2_CS
     
-    @pytest.mark.parametrize("degree_x,degree_y", [(10, 20), (5, 5)]) # Non-positive?
+    @pytest.mark.parametrize("degree_x,degree_y", [(10, 20), (5, 5)])
     def test_vf_2_cs(self, init_sheet, degree_x, degree_y):
         sheet, params = init_sheet
         mag = params.magnification_factor
@@ -478,7 +501,7 @@ class TestSheetWithMagnificationFactor:
 
     # CS_2_VF
 
-    @pytest.mark.parametrize("micro_meters_x,micro_meters_y", [(10, 20), (5, 5)]) # Non-positive?
+    @pytest.mark.parametrize("micro_meters_x,micro_meters_y", [(10, 20), (5, 5)])
     def test_cs_2_vf(self, init_sheet, micro_meters_x, micro_meters_y):
         sheet, params = init_sheet
         mag = params.magnification_factor
@@ -488,7 +511,7 @@ class TestSheetWithMagnificationFactor:
 
     # DVF_2_DCS
 
-    @pytest.mark.parametrize("distance_vf", [1,2,3]) # Non-positive?
+    @pytest.mark.parametrize("distance_vf", [1,2,3])
     def test_dvf_2_dcs(self, init_sheet, distance_vf):
         sheet, params = init_sheet
 
@@ -510,16 +533,14 @@ from mozaik.sheets.vision import VisualCorticalUniformSheet
 
 class TestVisualCorticalUniformSheet:
 
-    @pytest.fixture(scope="class", params=[1.0, 4, 1.2])
-    def _params(self, request, params): # fails for smaller values (1.0, 80, 90, 3), (1, 60, 50, 6), (1, 180, 45, 5)])
-        params['magnification_factor'] = request.param
-
-        yield params
+    @pytest.fixture(scope="class", params=["visual_cortical_sheet"])
+    def params(self, request):
+        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
 
 
     @pytest.fixture(scope="class") # (magnification_factor, sx, sy, density)
-    def init_sheet(self, mock_model, _params):
-        yield VisualCorticalUniformSheet(mock_model, _params), _params
+    def init_sheet(self, mock_model, params): # fails for smaller values (1.0, 80, 90, 3), (1, 60, 50, 6), (1, 180, 45, 5)])
+        yield VisualCorticalUniformSheet(mock_model, params), params
 
 
     # __INIT__
@@ -540,9 +561,7 @@ class TestVisualCorticalUniformSheet:
         # test if self.pop.positions was called
 
 
-    def test_init_sheet_w_mag_factor_call(self, mock_model, _params):
-        params = _params
-        
+    def test_init_sheet_w_mag_factor_call(self, mock_model, params):
         def set_vals(sheet, mock_model, params):
             sheet.model = mock_model
             sheet.sim, sheet.parameters, sheet.name = sheet.model.sim, params, params.name
@@ -560,17 +579,14 @@ from mozaik.sheets.vision import VisualCorticalUniformSheet3D
 
 class TestVisualCorticalUniformSheet3D:
 
-    @pytest.fixture(scope="class", params=[(1.0, 3, 3), (1.2, 5, 10), (1.5, 4, 6)]) #(1.0, 10000, 2000, 4, 3, 3), (1.2, 20000, 500, 6, 5, 10)]) What happens if min_depth > max depth
-    def _params(self, request, params): # fails for smaller values (1.2, 2.1, 3, 6, 3, 3), (4., .5, 6, 5, 5, 10)]) 
-        args = request.param
-        params['magnification_factor'], params['min_depth'], params['max_depth'] = args[0], args[1], args[2]
-        
-        yield params
+    @pytest.fixture(scope="class", params=["visual_cortical_sheet_3d"])
+    def params(self, request):
+        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
 
 
-    @pytest.fixture(scope="class") # (magnification_factor, sx, sy, density, min_depth, max_depth)
-    def init_sheet(self, mock_model, _params):
-        yield VisualCorticalUniformSheet3D(mock_model, _params), _params
+    @pytest.fixture(scope="class") # (magnification_factor, sx, sy, density, min_depth, max_depth) # What happens if min_depth > max depth
+    def init_sheet(self, mock_model, params): # fails for smaller values (1.2, 2.1, 3, 6, 3, 3), (4., .5, 6, 5, 5, 10)]) 
+        yield VisualCorticalUniformSheet3D(mock_model, params), params
 
 
     # __INIT__
@@ -591,9 +607,7 @@ class TestVisualCorticalUniformSheet3D:
         # test if self.pop.positions was called
 
 
-    def test_init_sheet_w_mag_factor_call(self, mock_model, _params):
-        params = _params
-        
+    def test_init_sheet_w_mag_factor_call(self, mock_model, params):
         def set_vals(sheet, mock_model, params):
             sheet.model = mock_model
             sheet.sim, sheet.parameters, sheet.name = sheet.model.sim, params, params.name
