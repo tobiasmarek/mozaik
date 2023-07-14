@@ -214,7 +214,7 @@ class TestSheet():
 
     # GET_NEURON_ANNOTATION
 
-    def test_get_neuron_annotation_value(self, init_sheet, _pop_mock_and_neuron_annotations, action):
+    def test_get_neuron_annotation_value(self, init_sheet, _pop_mock_and_neuron_annotations):
         sheet, _ = init_sheet
         _pop_mock, _neuron_annotations = _pop_mock_and_neuron_annotations # called too many times with low scope
         sheet._pop, sheet.pop, sheet._neuron_annotations = None, _pop_mock, _neuron_annotations
