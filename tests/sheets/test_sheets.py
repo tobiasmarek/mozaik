@@ -86,7 +86,7 @@ class TestSheet():
         sheet, params = init_sheet
         sheet._pop, sheet.pop = None, _pop_mock
 
-        mozaik.setup_mpi() # Initialize mozaik.rng for shuffling
+        mozaik.setup_mpi() # initialize mozaik.rng for shuffling
         sheet.setup_to_record_list()
 
         if params.recorders == {}:
@@ -172,9 +172,6 @@ class TestSheet():
                 ord_dict[f"key_{i},{j}"] = (False, f"ann_{i},{j}")
             
             _neuron_annotations.append(ord_dict)
-        
-        if width == 0:
-            print(_neuron_annotations)
         
         yield _pop_mock, _neuron_annotations
 
@@ -450,16 +447,21 @@ class TestRetinalUniformSheet:
         sheet, params = init_sheet
         
         assert isinstance(sheet.pop, pyNN.nest.Population)
-        # assert sheet.pop... == int(parameters.sx * parameters.sy * parameters.density)
-        # assert sheet.pop... == getattr(sheet.model.sim, params.cell.model)
-        # assert sheet.pop...params? == params.cell.params
+        assert len(sheet.pop) == int(params.sx * params.sy * params.density)
+
+        space_parameters = sheet.pop.celltype.parameter_space._parameters
+        assert all(key in space_parameters and space_parameters[key] == value for key, value in params.cell.params.items())
+
+        boundary = sheet.pop.structure.boundary
         assert isinstance(sheet.pop.structure, space.RandomStructure)
-        # assert sheet.pop.structure.boundary == space.Cuboid(params.sx, params.sy, 0)
-        # assert sheet.pop.structure... ==
-        # assert sheet.pop.initial_values == params.cell.initial_values
+        assert isinstance(boundary, space.Cuboid)
+        assert (boundary.width, boundary.height, boundary.depth) == (params.sx, params.sy, 0)
+        
+        # sheet.pop.initial_values['v'][0] # is checking initial_values required
+
         assert sheet.pop.label == params.name
 
-        # test if self.pop.positions was called
+        assert sheet.pop._positions is not None
 
 
     def test_init_sheet_call(self, mock_model, params):
@@ -485,16 +487,23 @@ class TestRetinalUniformSheet:
 
 from mozaik.sheets.vision import SheetWithMagnificationFactor
 
-class TestSheetWithMagnificationFactor:
+class MockedSheetWithMagnificationFactor(SheetWithMagnificationFactor):
+    """Because of missing 'density' in required_parameters of SheetWithMagnificationFactor class, a helper child class had to be created"""
+    required_parameters = ParameterSet({'density': float,})
+
+    def __init__(self, model, parameters):
+        SheetWithMagnificationFactor.__init__(self, model, parameters) 
+
+class TestSheetWithMagnificationFactor:   
 
     @pytest.fixture(scope="class", params=["sheet_w_mag_factor"])
     def params(self, request):
         yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
 
 
-    @pytest.fixture(scope="class") # (magnification_factor, sx, sy) DENSITY MISSING in required parameters
+    @pytest.fixture(scope="class") # (magnification_factor, sx, sy)
     def init_sheet(self, mock_model, params):
-        yield SheetWithMagnificationFactor(mock_model, params), params
+        yield MockedSheetWithMagnificationFactor(mock_model, params), params
 
 
     # __INIT__
@@ -530,7 +539,7 @@ class TestSheetWithMagnificationFactor:
         sheet, params = init_sheet
         mag = params.magnification_factor
         
-        assert sheet.cd_2_vf(micro_meters_x, micro_meters_y) == (micro_meters_x / mag, micro_meters_y / mag)
+        assert sheet.cs_2_vf(micro_meters_x, micro_meters_y) == (micro_meters_x / mag, micro_meters_y / mag)
 
 
     # DVF_2_DCS
@@ -573,16 +582,19 @@ class TestVisualCorticalUniformSheet:
         sheet, params = init_sheet
         
         assert isinstance(sheet.pop, pyNN.nest.Population)
-        # assert sheet.pop... == int(parameters.sx * parameters.sy * parameters.density)
-        # assert sheet.pop... == getattr(sheet.model.sim, params.cell.model)
-        # assert sheet.pop...params? == params.cell.params
-        # assert isinstance(sheet.pop.structure, space.RandomStructure)
-        # assert sheet.pop.structure.boundary == space.Cuboid(params.sx, params.sy, 0)
-        # assert sheet.pop.structure... == !!!
-        # assert sheet.pop.initial_values == params.cell.initial_values
-        # assert sheet.pop.label == params.name
+        assert len(sheet.pop) == int(params.sx * params.sy / 1000000 * params.density)
 
-        # test if self.pop.positions was called
+        space_parameters = sheet.pop.celltype.parameter_space._parameters
+        assert all(key in space_parameters and space_parameters[key] == value for key, value in params.cell.params.items())
+
+        boundary = sheet.pop.structure.boundary
+        assert isinstance(sheet.pop.structure, space.RandomStructure)
+        assert isinstance(boundary, space.Cuboid)
+        assert (boundary.width, boundary.height, boundary.depth) == (params.sx / params.magnification_factor, params.sy / params.magnification_factor, 0)
+
+        assert sheet.pop.label == params.name
+
+        assert sheet.pop._positions is not None
 
 
     def test_init_sheet_w_mag_factor_call(self, mock_model, params):
@@ -619,16 +631,21 @@ class TestVisualCorticalUniformSheet3D:
         sheet, params = init_sheet
         
         assert isinstance(sheet.pop, pyNN.nest.Population)
-        # assert sheet.pop... == int(parameters.sx * parameters.sy * parameters.density)
-        # assert sheet.pop... == getattr(sheet.model.sim, params.cell.model)
-        # assert sheet.pop...params? == params.cell.params
-        # assert isinstance(sheet.pop.structure, space.RandomStructure)
-        # assert sheet.pop.structure.boundary == space.Cuboid(params.sx, params.sy, 0)
-        # assert sheet.pop.structure... == !!!
-        # assert sheet.pop.initial_values == params.cell.initial_values
-        # assert sheet.pop.label == params.name
+        assert len(sheet.pop) == int(params.sx * params.sy / 1000000 * params.density)
 
-        # test if self.pop.positions was called
+        space_parameters = sheet.pop.celltype.parameter_space._parameters
+        assert all(key in space_parameters and space_parameters[key] == value for key, value in params.cell.params.items())
+
+        boundary = sheet.pop.structure.boundary
+        assert isinstance(sheet.pop.structure, space.RandomStructure)
+        assert isinstance(boundary, space.Cuboid)
+        mag = params.magnification_factor
+        assert (boundary.width, boundary.height, boundary.depth) == (params.sx / mag, params.sy/ mag, params.max_depth-params.min_depth)
+        assert sheet.pop.structure.origin == (0.0, 0.0, (params.min_depth+params.max_depth)/2.0) 
+
+        assert sheet.pop.label == params.name
+
+        assert sheet.pop._positions is not None
 
 
     def test_init_sheet_w_mag_factor_call(self, mock_model, params):
