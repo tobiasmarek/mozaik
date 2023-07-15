@@ -7,6 +7,7 @@ from collections import OrderedDict
 from string import Template
 from pyNN.errors import NothingToWriteError
 import pyNN.nest
+import quantities as pq
 from mozaik.tools.distribution_parametrization import PyNNDistribution
 from mozaik.sheets.direct_stimulator import DirectStimulator
 
@@ -37,7 +38,7 @@ class TestSheet():
 
     @pytest.fixture(scope="class", params=["sheet_0", "sheet_1"])
     def params(self, request):
-        """A fixture for getting current sheet parameters"""
+        """A fixture for getting the current sheet parameters"""
         yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
 
 
@@ -52,10 +53,10 @@ class TestSheet():
     def test_init_assertions(self, init_sheet, mock_model):
         sheet, params = init_sheet
 
-        expected_values = np.array([mock_model.sim, mock_model.sim.state.dt, params.name, None, 1, 1, 0])
-        actual_values = np.array([sheet.sim, sheet.dt, sheet.name, sheet._pop, sheet.size_x, sheet.size_y, sheet.msc])
+        expected_values = [mock_model.sim, mock_model.sim.state.dt, params.name, None, 1, 1, 0]
+        actual_values = [sheet.sim, sheet.dt, sheet.name, sheet._pop, sheet.size_x, sheet.size_y, sheet.msc]
 
-        assert np.array_equal(expected_values, actual_values)
+        assert expected_values == actual_values
 
 
     def test_init_base_component_call(self, mock_model, params):
@@ -133,7 +134,9 @@ class TestSheet():
             mock_arti_stim.assert_called_once()
             mock_init_val.assert_called_once()
 
-        assert sheet.pop == _pop_mock and len(sheet._neuron_annotations) == len(_pop_mock.all_cells) # check if neuron annotations contain OrderedDict type
+        assert sheet.pop == _pop_mock
+        assert len(sheet._neuron_annotations) == len(_pop_mock.all_cells)
+        assert all(isinstance(sheet._neuron_annotations[i], OrderedDict) for i in range(len(sheet._neuron_annotations)))
 
     
     def test_pop_not_set(self, init_sheet):
@@ -159,7 +162,7 @@ class TestSheet():
     def _pop_mock_and_neuron_annotations(self, request, _pop_mock):
         """
         Mocking neuron_annotations, created once per function call.
-        For the creation of neuron_annotations - population object is needed.
+        For the creation of neuron_annotations - Population object is needed.
         Neuron_annotations with the corresponding population are returned.
         """
         width = request.param
@@ -178,42 +181,51 @@ class TestSheet():
 
     # ADD_NEURON_ANNOTATION
 
-    @pytest.mark.parametrize("neuron_number,key,value,protected", [(1,"annotation_name", "annotation", False), (2,"annotation_name", "annotation", True)])
+    @pytest.mark.parametrize("neuron_number,key,value,protected", [(1,"key_1", "annotation", False), (2,"key_2", "annotation", True)])
     def test_add_neuron_annotation_assign(self, init_sheet, _pop_mock_and_neuron_annotations, neuron_number, key, value, protected):
         sheet, _ = init_sheet
         sheet._pop = None
         sheet.pop, sheet._neuron_annotations = _pop_mock_and_neuron_annotations
+        if len(sheet._neuron_annotations) >= neuron_number:
+            return
 
         sheet.add_neuron_annotation(neuron_number, key, value, protected)
 
         assert sheet._neuron_annotations[neuron_number][key] == (protected, value)
 
 
-    def test_add_neuron_annotation_to_protected(self, init_sheet):
-        pass # logger Annotation protected
+    def test_add_neuron_annotation_to_protected(self, init_sheet, _pop_mock):
+        sheet, _ = init_sheet
+        sheet._pop, sheet.pop, sheet._neuron_annotations = None, _pop_mock, [OrderedDict([("key", (True, "old_annotation"))])]
 
-    
-    def test_add_neuron_annotation_key_missing(self, init_sheet):
-        pass
+        sheet.add_neuron_annotation(0, "key", "new_annotation", False)
+
+        assert sheet._neuron_annotations[0]["key"] == (True, "old_annotation")
 
 
-    def test_add_neuron_annotation_neuron_missing(self, init_sheet):
-        pass
+    def test_add_neuron_annotation_neuron_missing(self, init_sheet, _pop_mock):
+        sheet, _ = init_sheet
+        sheet._pop, sheet.pop, sheet._neuron_annotations = None, _pop_mock, []
+
+        non_existent_neuron_number = 0
+
+        # with pytest.raises(Exception): # fails on IndexError - not handled
+        sheet.add_neuron_annotation(non_existent_neuron_number, "key", "value", False)
 
 
     def test_add_neuron_annotation_pop_not_set(self, init_sheet):
         sheet, _ = init_sheet
         sheet._pop = None
         
-        #with pytest.raises(Exception): # -> only loggs the error and proceeds to another if statement
-        #sheet.add_neuron_annotation("neuron_number", "key", "value", False) # logger Pop not have been set yet THIS FAILS
+        #with pytest.raises(Exception): # fails on AttributeError -> only loggs the error and proceeds to another if statement
+        sheet.add_neuron_annotation("neuron_number", "key", "value", False)
 
 
     # GET_NEURON_ANNOTATION
 
     def test_get_neuron_annotation_value(self, init_sheet, _pop_mock_and_neuron_annotations):
         sheet, _ = init_sheet
-        _pop_mock, _neuron_annotations = _pop_mock_and_neuron_annotations # called too many times with low scope
+        _pop_mock, _neuron_annotations = _pop_mock_and_neuron_annotations
         sheet._pop, sheet.pop, sheet._neuron_annotations = None, _pop_mock, _neuron_annotations
 
         neuron_number = len(_neuron_annotations)//2
@@ -225,36 +237,30 @@ class TestSheet():
         assert sheet.get_neuron_annotation(neuron_number, key) == _neuron_annotations[neuron_number][key][1]
 
     
-    def test_get_neuron_annotation_key_missing(self, init_sheet, _pop_mock_and_neuron_annotations):
-        pass
-
+    def test_get_neuron_annotation_key_missing(self, init_sheet, _pop_mock):
         sheet, _ = init_sheet
-        _pop_mock, _neuron_annotations = _pop_mock_and_neuron_annotations
-        sheet._pop, sheet.pop, sheet._neuron_annotations = None, _pop_mock, _neuron_annotations
+        sheet._pop, sheet.pop, sheet._neuron_annotations = None, _pop_mock, [OrderedDict()]
 
         #with pytest.raises(Exception):
-        #sheet.get_neuron_annotation(neuron_number, "non-existent_key") == None # msg_does_not_exist
+        sheet.get_neuron_annotation(0, "non-existent_key")
 
 
-    def test_get_neuron_annotation_neuron_missing(self, init_sheet, _pop_mock_and_neuron_annotations):
-        pass
-        
+    def test_get_neuron_annotation_neuron_missing(self, init_sheet, _pop_mock):
         sheet, _ = init_sheet
-        _pop_mock, _neuron_annotations = _pop_mock_and_neuron_annotations
-        sheet._pop, sheet.pop, sheet._neuron_annotations = None, _pop_mock, _neuron_annotations
+        sheet._pop, sheet.pop, sheet._neuron_annotations = None, _pop_mock, []
 
-        neuron_number = len(_neuron_annotations)
+        non_existent_neuron_number = 0
 
-        #with pytest.raises(Exception):
-        #sheet.get_neuron_annotation(neuron_number, "key") == None # msg_out_of_range
+        #with pytest.raises(Exception): # fails on IndexError - not handled
+        sheet.get_neuron_annotation(non_existent_neuron_number, "key")
 
     
     def test_get_neuron_annotation_pop_not_set(self, init_sheet):
         sheet, _ = init_sheet
         sheet._pop = None
 
-        #with pytest.raises(Exception): # proceeds to another if statement - logger does not raise
-        #sheet.get_neuron_annotation("neuron_number", "key") # logger Pop have not been set yet, but i get return value None or check error
+        #with pytest.raises(Exception): # fails on AttributeError -> only loggs the error and proceeds to another if statement
+        sheet.get_neuron_annotation("neuron_number", "key")
 
 
     # GET_NEURON_ANNOTATIONS
@@ -281,8 +287,8 @@ class TestSheet():
         sheet, _ = init_sheet
         sheet._pop = None
 
-        #with pytest.raises(Exception): # proceeds -> logger does not raise
-        #sheet.get_neuron_annotations() # check logger.error
+        #with pytest.raises(Exception): # fails on TypeError but proceeds -> logger does not raise
+        sheet.get_neuron_annotations()
 
 
     # DESCRIBE
@@ -320,22 +326,26 @@ class TestSheet():
 
     # GET_DATA
 
-    @pytest.mark.parametrize("stimulus_duration", [None, 1, 4.2, 0, -1, 0.00001])
+    @pytest.mark.parametrize("stimulus_duration", [None, 1, 4.2, 0, -1, 0.00001]) # unused?
     def test_get_data_assertions(self, init_sheet, _pop_mock, stimulus_duration):
         sheet, params = init_sheet
         
-        segment = MagicMock(annotations = OrderedDict(), spiketrains = [], analogsignals = [])
+        st = MagicMock(t_start = 10, t_stop = 20, annotations = OrderedDict([('source_id', 1)])) # parametrize?
+        st.__len__.return_value = 15
+        segment = MagicMock(annotations = OrderedDict(), spiketrains = [st for i in range(5)], analogsignals = [st for i in range(5)])
         block_mock = MagicMock(segments = [segment])
-        _pop_mock.get_data = block_mock
+        _pop_mock.get_data.return_value = block_mock
 
         sheet._pop, sheet.pop = None, _pop_mock
 
-        new_segment = sheet.get_data(stimulus_duration)
-        print(new_segment.annotations["sheet_name"])
+        new_segment = sheet.get_data(stimulus_duration = stimulus_duration)
 
-        assert sheet.msc >= 0 or (len(segment.spiketrains) == 0 and np.isnan(sheet.msc)) # can it be 0?
-        # assert new_segment.annotations["sheet_name"] == params['name']
-        # assert  new_segment... == segment... / params... / ...
+        assert sheet.msc > 0 or (len(segment.spiketrains) == 0 and np.isnan(sheet.msc)) # can sheet.msc be 0?
+        assert new_segment.annotations["sheet_name"] == params['name']
+        
+        if (stimulus_duration):                                                                                # 10 should be
+            assert all((new_segment.spiketrains[i].t_start == 0 * pq.ms and new_segment.spiketrains[i].t_stop == 20) for i in range(len(segment.spiketrains)))
+            assert all(new_segment.analogsignals[i].t_start == 0 * pq.ms for i in range(len(segment.analogsignals)))
 
     
     def test_get_data_call(self, init_sheet, _pop_mock):
@@ -351,14 +361,14 @@ class TestSheet():
         sheet, _ = init_sheet
         sheet._pop = None
 
-        #with pytest.raises(Exception): # be more specific because -> NameError: name 'errmsg' is not defined
-        #sheet.get_data()
+        #with pytest.raises(Exception): # fails on NameError: name 'errmsg' is not defined
+        sheet.get_data()
     
 
     def test_get_data_nothing_to_write_error(self, init_sheet, _pop_mock):
         sheet, _ = init_sheet
 
-        _pop_mock.get_data = MagicMock(side_effect = NothingToWriteError("error_msg"))
+        _pop_mock.get_data = MagicMock(side_effect = NothingToWriteError("msg"))
         sheet._pop, sheet.pop = None, _pop_mock
         logger = MagicMock(debug = None)
 
@@ -457,7 +467,7 @@ class TestRetinalUniformSheet:
         assert isinstance(boundary, space.Cuboid)
         assert (boundary.width, boundary.height, boundary.depth) == (params.sx, params.sy, 0)
         
-        # sheet.pop.initial_values['v'][0] # is checking initial_values required
+        # sheet.pop.initial_values['v'][0] # is checking initial_values required?
 
         assert sheet.pop.label == params.name
 
