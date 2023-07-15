@@ -2,7 +2,7 @@
 
     'sx' : 10,
     'sy' : 10,
-    'density' : 100,
+    'density' : 10,
 
     'cell': {
 
