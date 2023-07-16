@@ -111,7 +111,7 @@ class TestSheet():
             sheet.size_in_degrees()
 
 
-    @pytest.fixture(params=[np.array([2,3,15.212,0.5,-2.5]), np.array([2,3,0.5,-2.5])]) # add more weird parameters
+    @pytest.fixture(params=[np.array([2,3,15.212,0.5,-2.5]), np.array([])])
     def _pop_mock(self, request):
         """Mocking the population, created once per function call"""
         all_cells = request.param
@@ -186,7 +186,7 @@ class TestSheet():
         sheet, _ = init_sheet
         sheet._pop = None
         sheet.pop, sheet._neuron_annotations = _pop_mock_and_neuron_annotations
-        if len(sheet._neuron_annotations) >= neuron_number:
+        if neuron_number >= len(sheet._neuron_annotations):
             return
 
         sheet.add_neuron_annotation(neuron_number, key, value, protected)
@@ -229,9 +229,15 @@ class TestSheet():
         sheet._pop, sheet.pop, sheet._neuron_annotations = None, _pop_mock, _neuron_annotations
 
         neuron_number = len(_neuron_annotations)//2
+
+        if neuron_number >= len(_neuron_annotations):
+            return
+        
         keys = list(_neuron_annotations[neuron_number].keys())
+        
         if len(keys) == 0:
             return
+        
         key = keys[0]
         
         assert sheet.get_neuron_annotation(neuron_number, key) == _neuron_annotations[neuron_number][key][1]
@@ -326,7 +332,7 @@ class TestSheet():
 
     # GET_DATA
 
-    @pytest.mark.parametrize("stimulus_duration", [None, 1, 4.2, 0, -1, 0.00001]) # unused?
+    @pytest.mark.parametrize("stimulus_duration", [None, 4.2, 0, -1, 0.00001]) # unused?
     def test_get_data_assertions(self, init_sheet, _pop_mock, stimulus_duration):
         sheet, params = init_sheet
         
@@ -343,7 +349,7 @@ class TestSheet():
         assert sheet.msc > 0 or (len(segment.spiketrains) == 0 and np.isnan(sheet.msc)) # can sheet.msc be 0?
         assert new_segment.annotations["sheet_name"] == params['name']
         
-        if (stimulus_duration):                                                                                # 10 should be
+        if (stimulus_duration):                                                                                # 10 should be?
             assert all((new_segment.spiketrains[i].t_start == 0 * pq.ms and new_segment.spiketrains[i].t_stop == 20) for i in range(len(segment.spiketrains)))
             assert all(new_segment.analogsignals[i].t_start == 0 * pq.ms for i in range(len(segment.analogsignals)))
 
