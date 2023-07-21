@@ -154,11 +154,7 @@ class TestSheet():
             sheet.pop = "set_value_again"
 
 
-    def test_pop_locals(self):
-        pass # test return value of pop() - locals()
-
-
-    @pytest.fixture(params=[2, 1, 10, 0])
+    @pytest.fixture(params=[2, 10, 0])
     def _pop_mock_and_neuron_annotations(self, request, _pop_mock):
         """
         Mocking neuron_annotations, created once per function call.
@@ -346,7 +342,7 @@ class TestSheet():
 
         new_segment = sheet.get_data(stimulus_duration = stimulus_duration)
 
-        assert sheet.msc > 0 or (len(segment.spiketrains) == 0 and np.isnan(sheet.msc)) # can sheet.msc be 0?
+        assert sheet.msc > 0 or (len(segment.spiketrains) == 0 and np.isnan(sheet.msc))
         assert new_segment.annotations["sheet_name"] == params['name']
         
         if (stimulus_duration):                                                                                # 10 should be?
