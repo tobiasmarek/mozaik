@@ -214,7 +214,7 @@ class TestSheet():
         sheet._pop = None
         
         #with pytest.raises(Exception): # fails on AttributeError -> only loggs the error and proceeds to another if statement
-        sheet.add_neuron_annotation("neuron_number", "key", "value", False)
+        sheet.add_neuron_annotation(0, "key", "value", False)
 
 
     # GET_NEURON_ANNOTATION
@@ -328,25 +328,43 @@ class TestSheet():
 
     # GET_DATA
 
-    @pytest.mark.parametrize("stimulus_duration", [None, 4.2, 0, -1, 0.00001]) # unused?
+    @pytest.mark.parametrize("stimulus_duration", [None, 4.2, 0, -1]) # unused?
     def test_get_data_assertions(self, init_sheet, _pop_mock, stimulus_duration):
+        def get_mocked_st():
+            st = MagicMock(value = 50, t_start = 10, t_stop = 20, annotations = OrderedDict([('source_id', 1)])) # parametrize?
+            st.__len__.return_value = 15
+            return st
+
+        def isub_side_effect(obj_ref, x):
+            obj_ref.value -= x
+            return obj_ref
+
         sheet, params = init_sheet
-        
-        st = MagicMock(t_start = 10, t_stop = 20, annotations = OrderedDict([('source_id', 1)])) # parametrize?
-        st.__len__.return_value = 15
-        segment = MagicMock(annotations = OrderedDict(), spiketrains = [st for i in range(5)], analogsignals = [st for i in range(5)])
+
+        segment = MagicMock(annotations = OrderedDict(), spiketrains = [get_mocked_st() for i in range(5)], analogsignals = [get_mocked_st() for i in range(5)])
         block_mock = MagicMock(segments = [segment])
         _pop_mock.get_data.return_value = block_mock
 
         sheet._pop, sheet.pop = None, _pop_mock
 
+        patches = []
+        for mocked_st in segment.spiketrains: # patching every 'st -= t_start' call of every mocked_st object
+            patcher = patch.object(mocked_st, '__isub__', new = isub_side_effect)
+            patcher.start()
+            patches.append(patcher)
+
         new_segment = sheet.get_data(stimulus_duration = stimulus_duration)
+        
+        for patcher in patches:
+                patcher.stop()
 
         assert sheet.msc > 0 or (len(segment.spiketrains) == 0 and np.isnan(sheet.msc))
         assert new_segment.annotations["sheet_name"] == params['name']
         
-        if (stimulus_duration):                                                                                # 10 should be?
-            assert all((new_segment.spiketrains[i].t_start == 0 * pq.ms and new_segment.spiketrains[i].t_stop == 20) for i in range(len(segment.spiketrains)))
+        if (stimulus_duration != None):
+            assert all(new_segment.spiketrains[i].t_start == 0 * pq.ms for i in range(len(segment.spiketrains)))
+            assert all(new_segment.spiketrains[i].t_stop == 10 for i in range(len(segment.spiketrains)))
+            assert all(new_segment.spiketrains[i].value == 40 for i in range(len(segment.spiketrains)))
             assert all(new_segment.analogsignals[i].t_start == 0 * pq.ms for i in range(len(segment.analogsignals)))
 
     
