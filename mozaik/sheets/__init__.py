@@ -257,11 +257,13 @@ class Sheet(BaseComponent):
         segment : Segment
                 The segment holding all the recorded data. See NEO documentation for detail on the format.
         """
+        if not self._pop:
+            logger.error('Population has not been yet set in sheet: ' + self.name + '!')
 
         try:
             block = self.pop.get_data(['spikes', 'v', 'gsyn_exc', 'gsyn_inh'],clear=True)
-        except (NothingToWriteError, errmsg):
-            logger.debug(errmsg)
+        except NothingToWriteError as e:
+            logger.debug(e)
         
         if (mozaik.mpi_comm) and (mozaik.mpi_comm.rank != mozaik.MPI_ROOT):
            return None
