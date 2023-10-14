@@ -150,7 +150,7 @@ class TestSheet():
         sheet, _ = init_sheet
         sheet._pop, sheet.pop = None, _pop_mock
 
-        with pytest.raises(Exception):
+        with pytest.raises(Exception, match="Error population has already been set. It is not allowed to do this twice!"):
             sheet.pop = "set_value_again"
 
 
@@ -205,16 +205,16 @@ class TestSheet():
 
         non_existent_neuron_number = 0
 
-        # with pytest.raises(Exception): # fails on IndexError - not handled
-        sheet.add_neuron_annotation(non_existent_neuron_number, "key", "value", False)
+        with pytest.raises(IndexError): # unhandled in mozaik code
+            sheet.add_neuron_annotation(non_existent_neuron_number, "key", "value", False)
 
 
     def test_add_neuron_annotation_pop_not_set(self, init_sheet):
         sheet, _ = init_sheet
         sheet._pop = None
         
-        #with pytest.raises(Exception): # fails on AttributeError -> only loggs the error and proceeds to another if statement
-        sheet.add_neuron_annotation(0, "key", "value", False)
+        with pytest.raises(IndexError): # unhandled in mozaik code
+            sheet.add_neuron_annotation(0, "key", "value", False)
 
 
     # GET_NEURON_ANNOTATION
@@ -243,8 +243,8 @@ class TestSheet():
         sheet, _ = init_sheet
         sheet._pop, sheet.pop, sheet._neuron_annotations = None, _pop_mock, [OrderedDict()]
 
-        #with pytest.raises(Exception):
-        sheet.get_neuron_annotation(0, "non-existent_key")
+        with pytest.raises(KeyError): # unhandled in mozaik code
+            sheet.get_neuron_annotation(0, "non-existent_key")
 
 
     def test_get_neuron_annotation_neuron_missing(self, init_sheet, _pop_mock):
@@ -253,7 +253,7 @@ class TestSheet():
 
         non_existent_neuron_number = 0
 
-        with pytest.raises(IndexError):
+        with pytest.raises(IndexError): # unhandled in mozaik code
             sheet.get_neuron_annotation(non_existent_neuron_number, "key")
 
     
@@ -261,8 +261,8 @@ class TestSheet():
         sheet, _ = init_sheet
         sheet._pop = None
 
-        #with pytest.raises(Exception): # fails on AttributeError -> only loggs the error and proceeds to another if statement
-        sheet.get_neuron_annotation("neuron_number", "key")
+        with pytest.raises(IndexError): # unhandled in mozaik code
+            sheet.get_neuron_annotation(0, "key")
 
 
     # GET_NEURON_ANNOTATIONS
@@ -289,8 +289,8 @@ class TestSheet():
         sheet, _ = init_sheet
         sheet._pop = None
 
-        #with pytest.raises(Exception): # fails on TypeError but proceeds -> logger does not raise
-        sheet.get_neuron_annotations()
+        with pytest.raises(TypeError): # unhandled in mozaik code
+            sheet.get_neuron_annotations()
 
 
     # DESCRIBE
@@ -381,19 +381,20 @@ class TestSheet():
         sheet, _ = init_sheet
         sheet._pop = None
 
-        #with pytest.raises(Exception): # fails on NameError: name 'errmsg' is not defined
-        sheet.get_data()
+        with pytest.raises(AttributeError): # unhandled in mozaik code
+            sheet.get_data()
     
 
     def test_get_data_nothing_to_write_error(self, init_sheet, _pop_mock):
         sheet, _ = init_sheet
 
-        _pop_mock.get_data = MagicMock(side_effect = NothingToWriteError("msg"))
+        _pop_mock.get_data = MagicMock(side_effect = NothingToWriteError())
         sheet._pop, sheet.pop = None, _pop_mock
-        logger = MagicMock(debug = None)
 
-        with patch.object(logger, 'debug') as mock_debug:
-            sheet.get_data()
+        with patch.object(mozaik.getMozaikLogger(), 'debug', side_effect = RuntimeError()) as mock_debug:
+            with pytest.raises(RuntimeError): # to stop the function from proceeding further - needs revision
+                sheet.get_data()
+            
             mock_debug.assert_called_once()
 
 
