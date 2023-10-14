@@ -81,6 +81,19 @@ class TestSheet():
                 assert params.cell.params[key] == sheet.parameters.cell.params[key]
 
 
+    @pytest.fixture(params=[np.array([2,3,15.212,0.5,-2.5]), np.array([])])
+    def _pop_mock(self, request):
+        """Mocking the population, created once per function call"""
+        all_cells = request.param
+
+        _pop_mock = MagicMock(all_cells = all_cells)
+        _pop_mock.record = MagicMock()
+        _pop_mock.__getitem__.return_value = MagicMock(record = None)
+        _pop_mock.__len__.return_value = len(all_cells)
+
+        yield _pop_mock
+
+
     # SETUP_TO_RECORD_LIST
 
     def test_setup_to_record_list(self, init_sheet, _pop_mock):
@@ -109,19 +122,6 @@ class TestSheet():
 
         with pytest.raises(NotImplementedError):
             sheet.size_in_degrees()
-
-
-    @pytest.fixture(params=[np.array([2,3,15.212,0.5,-2.5]), np.array([])])
-    def _pop_mock(self, request):
-        """Mocking the population, created once per function call"""
-        all_cells = request.param
-
-        _pop_mock = MagicMock(all_cells = all_cells)
-        _pop_mock.record = MagicMock()
-        _pop_mock.__getitem__.return_value = MagicMock(record = None)
-        _pop_mock.__len__.return_value = len(all_cells)
-
-        yield _pop_mock
 
 
     # POP
