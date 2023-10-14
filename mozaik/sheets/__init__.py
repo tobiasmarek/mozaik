@@ -177,6 +177,8 @@ class Sheet(BaseComponent):
         """
         if not self._pop:
             logger.error('Population has not been yet set in sheet: ' + self.name + '!')
+        if neuron_number >= len(self._neuron_annotations):
+            logger.error("ERROR, neuron does not exist: " + self.name + " " + str(neuron_number))
         if (key in self._neuron_annotations[neuron_number] and self._neuron_annotations[neuron_number][key][0]):
             logger.warning('The annotation<' + str(key) + '> for neuron ' + str(neuron_number) + ' is protected. Annotation not updated')
         else:
@@ -202,6 +204,8 @@ class Sheet(BaseComponent):
 
         if not self._pop:
             logger.error('Population has not been yet set in sheet: ' + self.name + '!')
+        if neuron_number >= len(self._neuron_annotations):
+            logger.error("ERROR, neuron does not exist: " + self.name + " " + str(neuron_number))
         if key not in self._neuron_annotations[neuron_number]:
             logger.error("ERROR, annotation does not exist: " + self.name + " " + str(neuron_number) + " " + str(key) + " " + str(list(self._neuron_annotations[neuron_number].keys())))
 
