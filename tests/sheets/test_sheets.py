@@ -39,7 +39,7 @@ class TestSheet():
     @pytest.fixture(scope="class", params=["sheet_0", "sheet_1"])
     def params(self, request):
         """A fixture for getting the current sheet parameters"""
-        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
+        yield MozaikExtendedParameterSet(f"tests/sheets/SheetsTests/param/{request.param}")
 
 
     @pytest.fixture(scope="class")
@@ -253,8 +253,8 @@ class TestSheet():
 
         non_existent_neuron_number = 0
 
-        #with pytest.raises(Exception): # fails on IndexError - not handled
-        sheet.get_neuron_annotation(non_existent_neuron_number, "key")
+        with pytest.raises(IndexError):
+            sheet.get_neuron_annotation(non_existent_neuron_number, "key")
 
     
     def test_get_neuron_annotation_pop_not_set(self, init_sheet):
@@ -463,7 +463,7 @@ class TestRetinalUniformSheet:
 
     @pytest.fixture(scope="class", params=["retinal_sheet"])
     def params(self, request):
-        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
+        yield MozaikExtendedParameterSet(f"tests/sheets/SheetsTests/param/{request.param}")
 
 
     @pytest.fixture(scope="class")
@@ -528,7 +528,7 @@ class TestSheetWithMagnificationFactor:
 
     @pytest.fixture(scope="class", params=["sheet_w_mag_factor"])
     def params(self, request):
-        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
+        yield MozaikExtendedParameterSet(f"tests/sheets/SheetsTests/param/{request.param}")
 
 
     @pytest.fixture(scope="class") # (magnification_factor, sx, sy)
@@ -598,7 +598,7 @@ class TestVisualCorticalUniformSheet:
 
     @pytest.fixture(scope="class", params=["visual_cortical_sheet"])
     def params(self, request):
-        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
+        yield MozaikExtendedParameterSet(f"tests/sheets/SheetsTests/param/{request.param}")
 
 
     @pytest.fixture(scope="class") # (magnification_factor, sx, sy, density)
@@ -647,7 +647,7 @@ class TestVisualCorticalUniformSheet3D:
 
     @pytest.fixture(scope="class", params=["visual_cortical_sheet_3d"])
     def params(self, request):
-        yield MozaikExtendedParameterSet(f"SheetsTests/param/{request.param}")
+        yield MozaikExtendedParameterSet(f"tests/sheets/SheetsTests/param/{request.param}")
 
 
     @pytest.fixture(scope="class") # (magnification_factor, sx, sy, density, min_depth, max_depth) # What happens if min_depth > max depth
