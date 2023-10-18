@@ -45,7 +45,7 @@ class PopulationSelector(ParametrizedObject):
         ids : list
             List of selected ids.
         """
-        raise NotImplemented 
+        raise NotImplementedError
 
 class RCAll(PopulationSelector):
       """
