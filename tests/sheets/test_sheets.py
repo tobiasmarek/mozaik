@@ -488,8 +488,10 @@ class TestRetinalUniformSheet:
         assert isinstance(boundary, space.Cuboid)
         assert (boundary.width, boundary.height, boundary.depth) == (params.sx, params.sy, 0)
         
-        # sheet.pop.initial_values['v'][0] # is checking initial_values required?
-
+        assert all(
+            sheet.pop._get_cell_initial_value(neuron_id, 'v') == params.cell.initial_values.v
+            for neuron_id in range(sheet.pop.first_id, sheet.pop.last_id + 1)
+        )
         assert sheet.pop.label == params.name
 
         assert sheet.pop._positions is not None
@@ -623,6 +625,10 @@ class TestVisualCorticalUniformSheet:
         assert isinstance(boundary, space.Cuboid)
         assert (boundary.width, boundary.height, boundary.depth) == (params.sx / params.magnification_factor, params.sy / params.magnification_factor, 0)
 
+        assert all(
+            params.cell.initial_values.v.parameters['low'] <= sheet.pop._get_cell_initial_value(neuron_id, 'v') <= params.cell.initial_values.v.parameters['high']
+            for neuron_id in range(sheet.pop.first_id, sheet.pop.last_id + 1)
+        )
         assert sheet.pop.label == params.name
 
         assert sheet.pop._positions is not None
@@ -674,6 +680,10 @@ class TestVisualCorticalUniformSheet3D:
         assert (boundary.width, boundary.height, boundary.depth) == (params.sx / mag, params.sy/ mag, params.max_depth-params.min_depth)
         assert sheet.pop.structure.origin == (0.0, 0.0, (params.min_depth+params.max_depth)/2.0) 
 
+        assert all(
+            params.cell.initial_values.v.parameters['low'] <= sheet.pop._get_cell_initial_value(neuron_id, 'v') <= params.cell.initial_values.v.parameters['high']
+            for neuron_id in range(sheet.pop.first_id, sheet.pop.last_id + 1)
+        )
         assert sheet.pop.label == params.name
 
         assert sheet.pop._positions is not None
