@@ -1,0 +1,7 @@
+{
+    'annotation' : "annotation_text",
+    'distance' : 225.5,
+    'value': 130.0,
+    'num_of_cells': 200,
+    'period' :  0.0,
+}
