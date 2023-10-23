@@ -452,10 +452,6 @@ class TestSheet():
             mock_pop_set.assert_called_once_with(**sheet.dist_params)
 
 
-    def test_setup_initial_values_pine(self, init_sheet):
-        pass # pyNN population with initialize() and set()
-
-
 
 
 from mozaik.sheets.vision import RetinalUniformSheet
