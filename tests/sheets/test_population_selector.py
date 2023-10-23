@@ -1,4 +1,5 @@
 import mozaik
+import numpy as np
 from mozaik.core import ParametrizedObject
 from parameters import ParameterSet
 from mozaik.tools.distribution_parametrization import MozaikExtendedParameterSet
@@ -11,12 +12,14 @@ from unittest.mock import call
 
 
 @pytest.fixture(scope="module")
-def mock_sheet():
+def mock_sheet(): # or using the real Sheet class instead?
     """
     Mocking the Sheet class to separate the testing of PopulationSelector and the Sheet itself.
     Scope being equal to module means creating the mocked object only once per module.
     """
     sheet = MagicMock()
+    sheet.pop.all_cells = np.array([[0,1.5,3], [4,5.5,7]]) # more advanced
+    sheet.pop.positions = MagicMock() # need to be real positions, not mock
     
     yield sheet
 
@@ -78,11 +81,11 @@ class TestRCAll:
 
     def test_generate_idd_list_of_neurons(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
-        ...
-        # selected_pop = pop_sel.generate_idd_list_of_neurons
 
-        # assert len(pop_sel.sheet.pop.all_cells) == len(selected_pop) # líp brát len(parametrů)
-        # assert pop_sel.sheet.pop.all_cells == selected_pop # jinak
+        selected_pop = pop_sel.generate_idd_list_of_neurons()
+
+        assert len(pop_sel.sheet.pop.all_cells) == len(selected_pop)
+        # assert pop_sel.sheet.pop.all_cells.astype(int) == selected_pop # a little redundant
 
 
 
@@ -112,9 +115,14 @@ class TestRCRandomN:
 
 
     # GENERATE_IDD_LIST_OF_NEURONS
+    # parametrize smh
+    def test_generate_idd_list_of_neurons(self, init_pop_selector): # what if n > than real number of cells || <= 0
+        pop_sel, _ = init_pop_selector
 
-    def test_generate_idd_list_of_neurons(self): # what if n > than real number of cells
-        ...
+        selected_pop = pop_sel.generate_idd_list_of_neurons() # mozaik.rng returns None
+
+        assert len(selected_pop) == pop_sel.parameters.num_of_cells
+        assert selected_pop != pop_sel.sheet.pop.all_cells.astype(int)[:pop_sel.parameters.num_of_cells] # if shuffled
 
 
 
@@ -143,8 +151,14 @@ class TestRCRandomPercentage:
 
     # GENERATE_IDD_LIST_OF_NEURONS
 
-    def test_generate_idd_list_of_neurons(self): # what if percentage > 1.0
-        ...
+    def test_generate_idd_list_of_neurons(self, init_pop_selector): # what if percentage > 100 || <= 0
+        pop_sel, _ = init_pop_selector
+        true_len = int(len(pop_sel.sheet.pop.all_cells.astype(int)) * pop_sel.parameters.percentage/100)
+
+        selected_pop = pop_sel.generate_idd_list_of_neurons() # mozaik.rng returns None
+
+        assert len(selected_pop) == true_len
+        assert selected_pop != pop_sel.sheet.pop.all_cells.astype(int)[:true_len] # if shuffled
 
 
 
@@ -176,8 +190,19 @@ class TestRCGrid:
 
     # GENERATE_IDD_LIST_OF_NEURONS
 
-    def test_generate_idd_list_of_neurons(self):
+    def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
+        pop_sel, _ = init_pop_selector
+
+        selected_pop = pop_sel.generate_idd_list_of_neurons()
+        
         ...
+
+
+    def test_generate_idd_size_not_multiple_of_spacing(self, init_pop_selector): # unfinished
+        pop_sel, _ = init_pop_selector # size has to be a multiple of spacing, new param needed
+        
+        with pytest.raises(AssertionError):
+            pop_sel.generate_idd_list_of_neurons()
 
 
 
@@ -209,8 +234,19 @@ class TestRCGridDegree:
 
     # GENERATE_IDD_LIST_OF_NEURONS
 
-    def test_generate_idd_list_of_neurons(self):
+    def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
+        pop_sel, _ = init_pop_selector
+
+        selected_pop = pop_sel.generate_idd_list_of_neurons()
+        
         ...
+
+    
+    def test_generate_idd_size_not_multiple_of_spacing(self, init_pop_selector): # unfinished
+        pop_sel, _ = init_pop_selector # size has to be a multiple of spacing, new param needed
+        
+        with pytest.raises(AssertionError):
+            pop_sel.generate_idd_list_of_neurons()
 
 
 
@@ -243,14 +279,22 @@ class TestSimilarAnnotationSelector:
 
     # PICK_CLOSE_TO_ANNOTATION
 
-    def test_pick_close_to_annotation(self):
+    def test_pick_close_to_annotation_zero_period(self, init_pop_selector):
+        ...
+
+
+    def test_pick_close_to_annotation_non_zero_period(self, init_pop_selector):
         ...
 
 
     # GENERATE_IDD_LIST_OF_NEURONS
 
-    def test_generate_idd_list_of_neurons(self):
-        ...
+    def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
+        pop_sel, _ = init_pop_selector
+
+        selected_pop = pop_sel.generate_idd_list_of_neurons()
+        
+        ... # check if it is shuffled smh
 
 
 
@@ -287,5 +331,9 @@ class TestSimilarAnnotationSelectorRegion:
 
     # GENERATE_IDD_LIST_OF_NEURONS
 
-    def test_generate_idd_list_of_neurons(self):
-        ...
+    def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
+        pop_sel, _ = init_pop_selector
+
+        selected_pop = pop_sel.generate_idd_list_of_neurons()
+        
+        ... # check if it is shuffled smh and other things
