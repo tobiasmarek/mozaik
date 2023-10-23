@@ -18,7 +18,7 @@ def mock_sheet(): # or using the real Sheet class instead?
     Scope being equal to module means creating the mocked object only once per module.
     """
     sheet = MagicMock()
-    sheet.pop.all_cells = np.array([[0,1.5,3], [4,5.5,7]]) # more advanced
+    sheet.pop.all_cells = np.array([[0,1.5,3], [4,5.5,7]]) # not how all_cells look at all
     sheet.pop.positions = MagicMock() # need to be real positions, not mock
     
     yield sheet
@@ -84,8 +84,7 @@ class TestRCAll:
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
 
-        assert len(pop_sel.sheet.pop.all_cells) == len(selected_pop)
-        # assert pop_sel.sheet.pop.all_cells.astype(int) == selected_pop # a little redundant
+        assert len(pop_sel.sheet.pop.all_cells) == len(set(selected_pop))
 
 
 
@@ -121,7 +120,7 @@ class TestRCRandomN:
 
         selected_pop = pop_sel.generate_idd_list_of_neurons() # mozaik.rng returns None
 
-        assert len(selected_pop) == pop_sel.parameters.num_of_cells
+        assert len(set(selected_pop)) == pop_sel.parameters.num_of_cells
         assert selected_pop != pop_sel.sheet.pop.all_cells.astype(int)[:pop_sel.parameters.num_of_cells] # if shuffled
 
 
@@ -157,7 +156,7 @@ class TestRCRandomPercentage:
 
         selected_pop = pop_sel.generate_idd_list_of_neurons() # mozaik.rng returns None
 
-        assert len(selected_pop) == true_len
+        assert len(set(selected_pop)) == true_len
         assert selected_pop != pop_sel.sheet.pop.all_cells.astype(int)[:true_len] # if shuffled
 
 
@@ -195,7 +194,8 @@ class TestRCGrid:
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
         
-        ...
+        ... 
+
 
 
     def test_generate_idd_size_not_multiple_of_spacing(self, init_pop_selector): # unfinished
