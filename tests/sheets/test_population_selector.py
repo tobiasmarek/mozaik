@@ -2,6 +2,7 @@ import mozaik
 import numpy as np
 from mozaik.core import ParametrizedObject
 from parameters import ParameterSet
+from mozaik import setup_mpi
 from mozaik.tools.distribution_parametrization import MozaikExtendedParameterSet
 
 import pytest
@@ -12,14 +13,19 @@ from unittest.mock import call
 
 
 @pytest.fixture(scope="module")
+# param would be better
 def mock_sheet(): # or using the real Sheet class instead?
     """
     Mocking the Sheet class to separate the testing of PopulationSelector and the Sheet itself.
     Scope being equal to module means creating the mocked object only once per module.
     """
     sheet = MagicMock()
-    sheet.pop.all_cells = np.array([[0,1.5,3], [4,5.5,7]]) # not how all_cells look at all
-    sheet.pop.positions = MagicMock() # need to be real positions, not mock
+    sheet.pop.all_cells = np.array([i for i in range(5005, 5105)], dtype=object)
+    sheet.pop.positions = np.array([np.linspace(0, 1, 100), np.linspace(0, 1, 100)]) # better real pos?
+
+    mag = 0.1 # what if its not a sheet with magnification_factor?
+    sheet.cs_2_vf = MagicMock(side_effect=lambda x, y: (x / mag, y / mag))
+    sheet.vf_2_cs = MagicMock(side_effect=lambda x, y: (x * mag, y * mag))
     
     yield sheet
 
@@ -92,16 +98,12 @@ class TestRCAll:
 from mozaik.sheets.population_selector import RCRandomN
 
 class TestRCRandomN:
-
-    @pytest.fixture(scope="class", params=["rc_random_n_pop_sel"])
-    def params(self, request):
-        """A fixture for getting the current population selector's parameters"""
-        yield MozaikExtendedParameterSet(f"tests/sheets/PopulationSelectorTests/param/{request.param}")
     
-    
-    @pytest.fixture(scope="class")
-    def init_pop_selector(self, mock_sheet, params):
+    @pytest.fixture(scope="class", params=[1000, 311, 1]) # zero || negative || float n?
+    def init_pop_selector(self, request, mock_sheet):
         """A fixture for the initialization of the PopulationSelector object, created once"""
+        params = ParameterSet({"num_of_cells": request.param})
+
         yield RCRandomN(mock_sheet, params), params
 
 
@@ -115,28 +117,35 @@ class TestRCRandomN:
 
     # GENERATE_IDD_LIST_OF_NEURONS
     # parametrize smh
-    def test_generate_idd_list_of_neurons(self, init_pop_selector): # what if n > than real number of cells || <= 0
+    def test_generate_idd_list_of_neurons(self, init_pop_selector): # what if n <= 0
         pop_sel, _ = init_pop_selector
+        true_len = pop_sel.parameters.num_of_cells
+        
+        setup_mpi(mozaik_seed=513,pynn_seed=1023)
+        selected_pop = pop_sel.generate_idd_list_of_neurons()
 
-        selected_pop = pop_sel.generate_idd_list_of_neurons() # mozaik.rng returns None
-
-        assert len(set(selected_pop)) == pop_sel.parameters.num_of_cells
-        assert selected_pop != pop_sel.sheet.pop.all_cells.astype(int)[:pop_sel.parameters.num_of_cells] # if shuffled
+        if true_len <= len(pop_sel.sheet.pop.all_cells.astype(int)): # if n <= population size
+            assert len(selected_pop) == pop_sel.parameters.num_of_cells
+        else:
+            assert len(selected_pop) == len(pop_sel.sheet.pop.all_cells.astype(int))
+        if true_len > 0:
+            assert (selected_pop != pop_sel.sheet.pop.all_cells.astype(int)[:true_len]).any() # if shuffled # what if identity
+        else:
+            (selected_pop == [])
+        assert len(selected_pop) == len(list(set(selected_pop))) # if unique
+        assert all([id in pop_sel.sheet.pop.all_cells.astype(int) for id in selected_pop]) # if in the original population
 
 
 
 
 from mozaik.sheets.population_selector import RCRandomPercentage
 
-class TestRCRandomPercentage:
+class TestRCRandomPercentage:   
+    
+    @pytest.fixture(scope="class", params=[1, 11, 20.55, 100, 100.1, 150]) # zero || negative n?
+    def init_pop_selector(self, request, mock_sheet):
+        params = ParameterSet({"percentage": request.param})
 
-    @pytest.fixture(scope="class", params=["rc_random_percentage_pop_sel"])
-    def params(self, request):
-        yield MozaikExtendedParameterSet(f"tests/sheets/PopulationSelectorTests/param/{request.param}")
-    
-    
-    @pytest.fixture(scope="class")
-    def init_pop_selector(self, mock_sheet, params):
         yield RCRandomPercentage(mock_sheet, params), params
 
 
@@ -149,16 +158,24 @@ class TestRCRandomPercentage:
 
 
     # GENERATE_IDD_LIST_OF_NEURONS
-
-    def test_generate_idd_list_of_neurons(self, init_pop_selector): # what if percentage > 100 || <= 0
+    # parametrize smh
+    def test_generate_idd_list_of_neurons(self, init_pop_selector): # what if percentage <= 0
         pop_sel, _ = init_pop_selector
         true_len = int(len(pop_sel.sheet.pop.all_cells.astype(int)) * pop_sel.parameters.percentage/100)
+        
+        setup_mpi(mozaik_seed=513,pynn_seed=1023)
+        selected_pop = pop_sel.generate_idd_list_of_neurons()
 
-        selected_pop = pop_sel.generate_idd_list_of_neurons() # mozaik.rng returns None
-
-        assert len(set(selected_pop)) == true_len
-        assert selected_pop != pop_sel.sheet.pop.all_cells.astype(int)[:true_len] # if shuffled
-
+        if pop_sel.parameters.percentage <= 100: # if percentage <= 100
+            assert len(selected_pop) == true_len
+        else:
+            assert len(selected_pop) == len(pop_sel.sheet.pop.all_cells.astype(int))
+        if true_len > 0:
+            assert (selected_pop != pop_sel.sheet.pop.all_cells.astype(int)[:true_len]).any() # if shuffled # what if identity
+        else:
+            (selected_pop == [])
+        assert len(selected_pop) == len(list(set(selected_pop))) # if unique
+        assert all([id in pop_sel.sheet.pop.all_cells.astype(int) for id in selected_pop]) # if in the original population
 
 
 
@@ -197,9 +214,10 @@ class TestRCGrid:
         ... 
 
 
-
-    def test_generate_idd_size_not_multiple_of_spacing(self, init_pop_selector): # unfinished
-        pop_sel, _ = init_pop_selector # size has to be a multiple of spacing, new param needed
+    @pytest.mark.parametrize("size,spacing", [(3000, 2000), (1, 2), (11, 0.003)]) # what if size <= 0 || spacing <= 0
+    def test_generate_idd_size_not_multiple_of_spacing(self, init_pop_selector, size, spacing):
+        pop_sel, _ = init_pop_selector
+        pop_sel.parameters.size, pop_sel.parameters.spacing = size, spacing
         
         with pytest.raises(AssertionError):
             pop_sel.generate_idd_list_of_neurons()
@@ -241,9 +259,11 @@ class TestRCGridDegree:
         
         ...
 
-    
-    def test_generate_idd_size_not_multiple_of_spacing(self, init_pop_selector): # unfinished
-        pop_sel, _ = init_pop_selector # size has to be a multiple of spacing, new param needed
+
+    @pytest.mark.parametrize("size,spacing", [(3000, 2000), (1, 2), (11, 0.003)]) # what if size <= 0 || spacing <= 0
+    def test_generate_idd_size_not_multiple_of_spacing(self, init_pop_selector, size, spacing):
+        pop_sel, _ = init_pop_selector
+        pop_sel.parameters.size, pop_sel.parameters.spacing = size, spacing
         
         with pytest.raises(AssertionError):
             pop_sel.generate_idd_list_of_neurons()
@@ -292,7 +312,8 @@ class TestSimilarAnnotationSelector:
     def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
         pop_sel, _ = init_pop_selector
 
-        selected_pop = pop_sel.generate_idd_list_of_neurons()
+        selected_pop = pop_sel.generate_idd_list_of_neurons() # line 237 population_selector.py
+        # 'z' is not defined
         
         ... # check if it is shuffled smh
 
