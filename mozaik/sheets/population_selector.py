@@ -33,7 +33,8 @@ class PopulationSelector(ParametrizedObject):
           
     def __init__(self, sheet, parameters):
         ParametrizedObject.__init__(self, parameters)
-        self.sheet = sheet  
+        self.sheet = sheet
+        self.z = self.sheet.pop.all_cells.astype(int)
 
     def generate_idd_list_of_neurons(self):
         """
@@ -52,7 +53,7 @@ class RCAll(PopulationSelector):
       This PopulationSelector selects all neurons in the sheet.
       """
       def generate_idd_list_of_neurons(self):
-          return self.sheet.pop.all_cells.astype(int)
+          return self.z
 
 class RCRandomN(PopulationSelector):
       """
@@ -71,9 +72,8 @@ class RCRandomN(PopulationSelector):
       })  
         
       def generate_idd_list_of_neurons(self):
-          z = self.sheet.pop.all_cells.astype(int)
-          mozaik.rng.shuffle(z)
-          return z[:self.parameters.num_of_cells]
+          mozaik.rng.shuffle(self.z)
+          return self.z[:self.parameters.num_of_cells]
 
 class RCRandomPercentage(PopulationSelector):
       """
@@ -93,9 +93,8 @@ class RCRandomPercentage(PopulationSelector):
       })  
         
       def generate_idd_list_of_neurons(self):
-          z = self.sheet.pop.all_cells.astype(int)
-          mozaik.rng.shuffle(z)
-          return z[:int(len(z)*self.parameters.percentage/100)]
+          mozaik.rng.shuffle(self.z)
+          return self.z[:int(len(self.z)*self.parameters.percentage/100)]
 
           
 class RCGrid(PopulationSelector):
@@ -134,11 +133,10 @@ class RCGrid(PopulationSelector):
           assert math.fmod(self.parameters.size,self.parameters.spacing) < 0.000000001 , "Error the size has to be multiple of spacing!"
           
           picked = []
-          z = self.sheet.pop.all_cells.astype(int)
           for x in self.parameters.offset_x + numpy.arange(0,self.parameters.size,self.parameters.spacing) - self.parameters.size/2.0:
               for y in self.parameters.offset_y + numpy.arange(0,self.parameters.size,self.parameters.spacing) - self.parameters.size/2.0:
                   xx,yy = self.sheet.cs_2_vf(x,y)
-                  picked.append(z[numpy.argmin(numpy.power(self.sheet.pop.positions[0] - xx,2) +  numpy.power(self.sheet.pop.positions[1] - yy,2))])
+                  picked.append(self.z[numpy.argmin(numpy.power(self.sheet.pop.positions[0] - xx,2) +  numpy.power(self.sheet.pop.positions[1] - yy,2))])
           
           logger.info("RCGrid> picked neurons: " + str(picked))
           return list(set(picked))
@@ -179,10 +177,9 @@ class RCGridDegree(PopulationSelector):
           assert math.fmod(self.parameters.size*1000,self.parameters.spacing*1000) < 0.000000001 , "Error the size has to be multiple of spacing!"
 
           picked = []
-          z = self.sheet.pop.all_cells.astype(int)
           for x in self.parameters.offset_x + numpy.arange(0,self.parameters.size,self.parameters.spacing) - self.parameters.size/2.0:
               for y in self.parameters.offset_y + numpy.arange(0,self.parameters.size,self.parameters.spacing) - self.parameters.size/2.0:
-                  picked.append(z[numpy.argmin(numpy.power(self.sheet.pop.positions[0] - x,2) +  numpy.power(self.sheet.pop.positions[1] - y,2))])
+                  picked.append(self.z[numpy.argmin(numpy.power(self.sheet.pop.positions[0] - x,2) +  numpy.power(self.sheet.pop.positions[1] - y,2))])
 
           logger.info("RCGrid> picked neurons: " + str(picked))
           return list(set(picked))
@@ -222,19 +219,18 @@ class SimilarAnnotationSelector(PopulationSelector):
       })  
       def pick_close_to_annotation(self):
           picked = []
-          z = self.sheet.pop.all_cells.astype(int)
-          vals = [self.sheet.get_neuron_annotation(i,self.parameters.annotation) for i in range(0,len(z))]
+          vals = [self.sheet.get_neuron_annotation(i,self.parameters.annotation) for i in range(0,len(self.z))]
           if self.parameters.period != 0:
-            picked = numpy.array([i for i in range(0,len(z)) if abs(vals[i]-self.parameters.value) < self.parameters.distance])
+            picked = numpy.array([i for i in range(0,len(self.z)) if abs(vals[i]-self.parameters.value) < self.parameters.distance])
           else:
-            picked = numpy.array([i for i in range(0,len(z)) if circular_dist(vals[i],self.parameters.value,self.parameters.period) < self.parameters.distance])  
+            picked = numpy.array([i for i in range(0,len(self.z)) if circular_dist(vals[i],self.parameters.value,self.parameters.period) < self.parameters.distance])  
           
           return picked
       
       def generate_idd_list_of_neurons(self):
           picked = sorted(self.pick_close_to_annotation())
           mozaik.rng.shuffle(picked)
-          return z[picked[:self.parameters.num_of_cells]]
+          return self.z[picked[:self.parameters.num_of_cells]]
           
           
           
@@ -287,6 +283,5 @@ class SimilarAnnotationSelectorRegion(SimilarAnnotationSelector):
                                                       )])
           picked = sorted(list(picked_or & picked_region))
           mozaik.rng.shuffle(picked)
-          z = self.sheet.pop.all_cells.astype(int)
-          return z[picked[:self.parameters.num_of_cells]]
+          return self.z[picked[:self.parameters.num_of_cells]]
            
