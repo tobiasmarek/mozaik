@@ -49,6 +49,7 @@ class TestPopulationSelector:
         pop_sel, _ = init_pop_selector
 
         assert pop_sel.sheet == mock_sheet
+        assert all(pop_sel.z == mock_sheet.pop.all_cells.astype(int))
 
 
     def test_init_parametrized_object_call(self, mock_sheet):
@@ -86,13 +87,14 @@ class TestRCAll:
 
     def test_generate_idd_list_of_neurons(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
-        sel_len = len(pop_sel.sheet.pop.all_cells)
+        z = pop_sel.sheet.pop.all_cells.astype(int)
+        sel_len = len(z)
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
 
         assert len(selected_pop) == sel_len
         assert len(selected_pop) == len(list(set(selected_pop))) # if unique
-        assert all([id in pop_sel.sheet.pop.all_cells.astype(int) for id in selected_pop]) # if in the original population
+        assert all([id in z for id in selected_pop]) # if in the original population
 
 
 
@@ -122,20 +124,21 @@ class TestRCRandomN:
     def test_generate_idd_list_of_neurons(self, init_pop_selector): # what if n <= 0
         pop_sel, _ = init_pop_selector
         sel_len = pop_sel.parameters.num_of_cells
+        z = pop_sel.sheet.pop.all_cells.astype(int)
         
         setup_mpi(mozaik_seed=513,pynn_seed=1023) # parametrize?
         selected_pop = pop_sel.generate_idd_list_of_neurons()
 
-        if sel_len <= len(pop_sel.sheet.pop.all_cells.astype(int)): # if n <= population size
+        if sel_len <= len(z): # if n <= population size
             assert len(selected_pop) == sel_len
         else:
-            assert len(selected_pop) == len(pop_sel.sheet.pop.all_cells.astype(int))
+            assert len(selected_pop) == len(z)
         if sel_len > 0:
-            assert (selected_pop != pop_sel.sheet.pop.all_cells.astype(int)[:sel_len]).any() # if shuffled # what if identity
+            assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity
         else:
             (selected_pop == [])
         assert len(selected_pop) == len(list(set(selected_pop))) # if unique
-        assert all([id in pop_sel.sheet.pop.all_cells.astype(int) for id in selected_pop]) # if in the original population
+        assert all([id in z for id in selected_pop]) # if in the original population
 
 
 
@@ -163,7 +166,8 @@ class TestRCRandomPercentage:
 
     def test_generate_idd_list_of_neurons(self, init_pop_selector): # what if percentage <= 0
         pop_sel, _ = init_pop_selector
-        sel_len = int(len(pop_sel.sheet.pop.all_cells.astype(int)) * pop_sel.parameters.percentage/100)
+        z = pop_sel.sheet.pop.all_cells.astype(int)
+        sel_len = int(len(z) * pop_sel.parameters.percentage/100)
         
         setup_mpi(mozaik_seed=513,pynn_seed=1023) # parametrize?
         selected_pop = pop_sel.generate_idd_list_of_neurons()
@@ -171,13 +175,13 @@ class TestRCRandomPercentage:
         if pop_sel.parameters.percentage <= 100: # if percentage <= 100
             assert len(selected_pop) == sel_len
         else:
-            assert len(selected_pop) == len(pop_sel.sheet.pop.all_cells.astype(int))
+            assert len(selected_pop) == len(z)
         if sel_len > 0:
-            assert (selected_pop != pop_sel.sheet.pop.all_cells.astype(int)[:sel_len]).any() # if shuffled # what if identity
+            assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity
         else:
             (selected_pop == [])
         assert len(selected_pop) == len(list(set(selected_pop))) # if unique
-        assert all([id in pop_sel.sheet.pop.all_cells.astype(int) for id in selected_pop]) # if in the original population
+        assert all([id in z for id in selected_pop]) # if in the original population
 
 
 
@@ -259,11 +263,15 @@ class TestRCGridDegree:
     def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
         pop_sel, _ = init_pop_selector
         max_sel_len = (pop_sel.parameters.size / pop_sel.parameters.spacing)**2 # number of electrodes
+        centered_electrodes = np.arange(0, pop_sel.parameters.size, pop_sel.parameters.spacing) - pop_sel.parameters.size/2.0
+        xx = [x for x in pop_sel.parameters.offset_x + centered_electrodes]
+        yy = [y for y in pop_sel.parameters.offset_y + centered_electrodes]
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
         
         assert len(selected_pop) <= max_sel_len
-        # re-verify that for each point of the grid, there exist a selected neuron closer to that point than any of the non-selected neurons
+        assert all(pop_sel.z[np.argmin((pop_sel.sheet.pop.positions[0] - x)**2 +  (pop_sel.sheet.pop.positions[1] - y)**2)]\
+            in selected_pop for x in xx for y in yy)
 
 
     @pytest.mark.parametrize("size,spacing", [(3000, 2000), (1, 2), (11, 0.003)]) # what if size <= 0 || spacing <= 0
