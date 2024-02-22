@@ -4,6 +4,7 @@ from mozaik.core import ParametrizedObject
 from parameters import ParameterSet
 from mozaik import setup_mpi
 from mozaik.tools.distribution_parametrization import MozaikExtendedParameterSet
+from mozaik.tools.circ_stat import circular_dist
 
 import pytest
 from unittest.mock import MagicMock
@@ -22,10 +23,13 @@ def mock_sheet(): # request
     sheet.pop.all_cells = np.array([i for i in range(5005, 5105)], dtype=object)
     sheet.pop.positions = np.array([np.linspace(0, 1, 100), np.linspace(0, 1, 100)]) # better real pos?
 
-    mag = 0.1 # what if its not a sheet with magnification_factor?
-    sheet.cs_2_vf = MagicMock(side_effect=lambda x, y: (x / mag, y / mag))
-    sheet.vf_2_cs = MagicMock(side_effect=lambda x, y: (x * mag, y * mag))
+    sheet.magnification_factor = 0.1 # what if its not a sheet with magnification_factor?
+    sheet.cs_2_vf = MagicMock(side_effect=lambda x, y: (x / sheet.magnification_factor, y / sheet.magnification_factor))
+    sheet.vf_2_cs = MagicMock(side_effect=lambda x, y: (x * sheet.magnification_factor, y * sheet.magnification_factor))
     
+    _neuron_annotations = [i for i in range(len(sheet.pop.all_cells))] # does not let me to have an object there (namely str f"ann_{i},0")
+    sheet.get_neuron_annotation = MagicMock(side_effect=lambda i, ann: _neuron_annotations[i])
+
     yield sheet
 
 
@@ -212,14 +216,17 @@ class TestRCGrid:
 
     # GENERATE_IDD_LIST_OF_NEURONS
 
-    def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
+    def test_generate_idd_list_of_neurons(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
         max_sel_len = (pop_sel.parameters.size / pop_sel.parameters.spacing)**2 # number of electrodes
+        centered_electrodes = np.arange(0, pop_sel.parameters.size, pop_sel.parameters.spacing) - pop_sel.parameters.size/2.0
+        xx = [x / pop_sel.sheet.magnification_factor for x in pop_sel.parameters.offset_x + centered_electrodes] # what if not sheet w mag factor
+        yy = [y / pop_sel.sheet.magnification_factor for y in pop_sel.parameters.offset_y + centered_electrodes] # what if not sheet w mag factor
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
         
         assert len(selected_pop) <= max_sel_len
-        # re-verify that for each point of the grid, there exist a selected neuron closer to that point than any of the non-selected neurons
+        assert all(pop_sel.z[np.argmin((pop_sel.sheet.pop.positions[0] - x)**2 +  (pop_sel.sheet.pop.positions[1] - y)**2)] in selected_pop for x in xx for y in yy)
 
 
     @pytest.mark.parametrize("size,spacing", [(3000, 2000), (1, 2), (11, 0.003)]) # what if size <= 0 || spacing <= 0
@@ -260,7 +267,7 @@ class TestRCGridDegree:
 
     # GENERATE_IDD_LIST_OF_NEURONS
 
-    def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
+    def test_generate_idd_list_of_neurons(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
         max_sel_len = (pop_sel.parameters.size / pop_sel.parameters.spacing)**2 # number of electrodes
         centered_electrodes = np.arange(0, pop_sel.parameters.size, pop_sel.parameters.spacing) - pop_sel.parameters.size/2.0
@@ -314,21 +321,42 @@ class TestSimilarAnnotationSelector:
     # PICK_CLOSE_TO_ANNOTATION
 
     def test_pick_close_to_annotation_zero_period(self, init_pop_selector):
-        ...
+        pop_sel, _ = init_pop_selector
+        pop_sel.parameters.period = 0 # beware - mocked pop_sel.parameters are for all the functions in this class
+
+        picked = pop_sel.pick_close_to_annotation()
+
+        assert len(picked) <= len(pop_sel.z)
+        assert len(picked) == len(list(set(picked))) # if unique # does it have to be unique?
+        assert all([id in np.arange(0, len(pop_sel.z)) for id in picked]) # if in the original population
+        # check distance restriction with abs
 
 
     def test_pick_close_to_annotation_non_zero_period(self, init_pop_selector):
-        ...
+        pop_sel, _ = init_pop_selector
+        pop_sel.parameters.period = 2.0 # beware - mocked pop_sel.parameters are for all the functions in this class
+
+        picked = pop_sel.pick_close_to_annotation()
+
+        assert len(picked) <= len(pop_sel.z)
+        assert len(picked) == len(list(set(picked))) # if unique # does it have to be unique?
+        assert all([id in np.arange(0, len(pop_sel.z)) for id in picked]) # if in the original population
+        # check distance restriction circular_dist
 
 
     # GENERATE_IDD_LIST_OF_NEURONS
 
     def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
         pop_sel, _ = init_pop_selector
+        sel_len = pop_sel.parameters.num_of_cells
+        picked = sorted(pop_sel.pick_close_to_annotation()) # calling another function (not mocked)
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
         
-        ... # check if it is shuffled smh
+        if sel_len > 0:
+            assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity
+        else:
+            pass # ? # what if sel_len > than the actual number of cells (or just greater than the picked array)
 
 
 
