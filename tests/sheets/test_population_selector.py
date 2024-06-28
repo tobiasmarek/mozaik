@@ -322,6 +322,7 @@ class TestSimilarAnnotationSelector:
 
     def test_pick_close_to_annotation_zero_period(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
+        vals = [pop_sel.sheet.get_neuron_annotation(i, pop_sel.parameters.annotation) for i in range(len(pop_sel.z))]
         pop_sel.parameters.period = 0 # beware - mocked pop_sel.parameters are for all the functions in this class
 
         picked = pop_sel.pick_close_to_annotation()
@@ -329,11 +330,12 @@ class TestSimilarAnnotationSelector:
         assert len(picked) <= len(pop_sel.z)
         assert len(picked) == len(list(set(picked))) # if unique # does it have to be unique?
         assert all([id in np.arange(0, len(pop_sel.z)) for id in picked]) # if in the original population
-        # check distance restriction with abs
+        assert all([abs(vals[id] - pop_sel.parameters.value) <= pop_sel.parameters.distance for id in picked]) # check distance restriction with abs
 
 
     def test_pick_close_to_annotation_non_zero_period(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
+        vals = [pop_sel.sheet.get_neuron_annotation(i, pop_sel.parameters.annotation) for i in range(len(pop_sel.z))]
         pop_sel.parameters.period = 2.0 # beware - mocked pop_sel.parameters are for all the functions in this class
 
         picked = pop_sel.pick_close_to_annotation()
@@ -341,7 +343,7 @@ class TestSimilarAnnotationSelector:
         assert len(picked) <= len(pop_sel.z)
         assert len(picked) == len(list(set(picked))) # if unique # does it have to be unique?
         assert all([id in np.arange(0, len(pop_sel.z)) for id in picked]) # if in the original population
-        # check distance restriction circular_dist
+        assert all([circular_dist(vals[id], pop_sel.parameters.value, pop_sel.parameters.period) <= pop_sel.parameters.distance for id in picked]) # check distance restriction circular_dist
 
 
     # GENERATE_IDD_LIST_OF_NEURONS
@@ -354,9 +356,13 @@ class TestSimilarAnnotationSelector:
         selected_pop = pop_sel.generate_idd_list_of_neurons()
         
         if sel_len > 0:
+            if sel_len <= len(pop_sel.z): # if n <= population size
+                assert len(selected_pop) == sel_len
+            else:
+                assert len(selected_pop) == len(pop_sel.z)
             assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity
         else:
-            pass # ? # what if sel_len > than the actual number of cells (or just greater than the picked array)
+            assert selected_pop == []
 
 
 
