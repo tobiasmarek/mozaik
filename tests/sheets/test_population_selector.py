@@ -351,7 +351,7 @@ class TestSimilarAnnotationSelector:
     def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
         pop_sel, _ = init_pop_selector
         sel_len = pop_sel.parameters.num_of_cells
-        picked = sorted(pop_sel.pick_close_to_annotation()) # calling another function (not mocked)
+        picked = sorted(pop_sel.pick_close_to_annotation()) # not mocked! # shouldnt that be a set()?
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
         
@@ -401,7 +401,18 @@ class TestSimilarAnnotationSelectorRegion:
 
     def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
         pop_sel, _ = init_pop_selector
+        sel_len = pop_sel.parameters.num_of_cells
+        picked_or = set(pop_sel.pick_close_to_annotation()) # not mocked!
+        xx, yy = pop_sel.sheet.vf_2_cs(pop_sel.sheet.pop.positions[0], pop_sel.sheet.pop.positions[1])
+        picked_region = set(np.arange(0,len(xx))[np.logical_and(abs(np.array(xx - pop_sel.parameters.offset_x))\
+            < pop_sel.parameters.size/2.0, abs(np.array(yy - pop_sel.parameters.offset_y)) < pop_sel.parameters.size/2.0)])
+        picked = sorted(list(picked_or & picked_region))
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
         
-        ... # check if it is shuffled smh and other things
+        if sel_len > 0:
+            assert len(selected_pop) <= min(sel_len, len(pop_sel.z)) # check upper bound
+            assert len(selected_pop) == len(picked)
+            assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity
+        else:
+            assert selected_pop == []
