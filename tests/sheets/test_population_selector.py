@@ -13,17 +13,19 @@ from unittest.mock import call
 
 
 
-@pytest.fixture(scope="module") # , params=[1, 11, 20.55, 100, 100.1, 150]
-def mock_sheet(): # request
+@pytest.fixture(scope="module", params=[(1, 0.1), (11, 0.15), (42, 0.05), (100, 0.5)]) # (num_of_cells, magnification_factor)
+def mock_sheet(request):
     """
     Mocking the Sheet class to separate the testing of PopulationSelector and the Sheet itself.
     Scope being equal to module means creating the mocked object only once per module.
     """
     sheet = MagicMock()
-    sheet.pop.all_cells = np.array([i for i in range(5005, 5105)], dtype=object)
-    sheet.pop.positions = np.array([np.linspace(0, 1, 100), np.linspace(0, 1, 100)]) # better real pos?
 
-    sheet.magnification_factor = 0.1 # what if its not a sheet with magnification_factor?
+    num_of_cells, sheet.magnification_factor = request.param # what if its not a sheet with magnification_factor?
+
+    sheet.pop.all_cells = np.array([i for i in range(0, num_of_cells)], dtype=object)
+    sheet.pop.positions = np.array([np.linspace(0, 1, len(sheet.pop.all_cells)), np.linspace(0, 1, len(sheet.pop.all_cells))]) # better real pos?
+
     sheet.cs_2_vf = MagicMock(side_effect=lambda x, y: (x / sheet.magnification_factor, y / sheet.magnification_factor))
     sheet.vf_2_cs = MagicMock(side_effect=lambda x, y: (x * sheet.magnification_factor, y * sheet.magnification_factor))
     
@@ -107,7 +109,7 @@ from mozaik.sheets.population_selector import RCRandomN
 
 class TestRCRandomN:
     
-    @pytest.fixture(scope="class", params=[1000, 311, 1]) # zero || negative || float n?
+    @pytest.fixture(scope="class", params=[1000, 311, 1, 0]) # negative || float n?
     def init_pop_selector(self, request, mock_sheet):
         """A fixture for the initialization of the PopulationSelector object, created once"""
         params = ParameterSet({"num_of_cells": request.param})
@@ -137,8 +139,9 @@ class TestRCRandomN:
             assert len(selected_pop) == sel_len
         else:
             assert len(selected_pop) == len(z)
-        if sel_len > 0:
-            assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity
+        if sel_len > 0: 
+            if len(selected_pop) > 1: # if able to shuffle
+                assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity
         else:
             (selected_pop == [])
         assert len(selected_pop) == len(list(set(selected_pop))) # if unique
@@ -151,7 +154,7 @@ from mozaik.sheets.population_selector import RCRandomPercentage
 
 class TestRCRandomPercentage:   
     
-    @pytest.fixture(scope="class", params=[1, 11, 20.55, 100, 100.1, 150]) # zero || negative n?
+    @pytest.fixture(scope="class", params=[1, 11, 20.55, 100, 100.1, 150, 0]) # negative n?
     def init_pop_selector(self, request, mock_sheet):
         params = ParameterSet({"percentage": request.param})
 
@@ -181,7 +184,8 @@ class TestRCRandomPercentage:
         else:
             assert len(selected_pop) == len(z)
         if sel_len > 0:
-            assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity
+            if len(selected_pop) > 1: # if able to shuffle
+                assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity
         else:
             (selected_pop == [])
         assert len(selected_pop) == len(list(set(selected_pop))) # if unique
@@ -229,7 +233,7 @@ class TestRCGrid:
         assert all(pop_sel.z[np.argmin((pop_sel.sheet.pop.positions[0] - x)**2 +  (pop_sel.sheet.pop.positions[1] - y)**2)] in selected_pop for x in xx for y in yy)
 
 
-    @pytest.mark.parametrize("size,spacing", [(3000, 2000), (1, 2), (11, 0.003)]) # what if size <= 0 || spacing <= 0
+    @pytest.mark.parametrize("size,spacing", [(3000, 2000), (1, 2), (11, 0.003)])
     def test_generate_idd_size_not_multiple_of_spacing(self, init_pop_selector, size, spacing):
         pop_sel, _ = init_pop_selector
         pop_sel.parameters.size, pop_sel.parameters.spacing = size, spacing
@@ -281,7 +285,7 @@ class TestRCGridDegree:
             in selected_pop for x in xx for y in yy)
 
 
-    @pytest.mark.parametrize("size,spacing", [(3000, 2000), (1, 2), (11, 0.003)]) # what if size <= 0 || spacing <= 0
+    @pytest.mark.parametrize("size,spacing", [(3000, 2000), (1, 2), (11, 0.003)])
     def test_generate_idd_size_not_multiple_of_spacing(self, init_pop_selector, size, spacing):
         pop_sel, _ = init_pop_selector
         pop_sel.parameters.size, pop_sel.parameters.spacing = size, spacing
@@ -360,7 +364,11 @@ class TestSimilarAnnotationSelector:
                 assert len(selected_pop) == sel_len
             else:
                 assert len(selected_pop) == len(pop_sel.z)
-            assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity
+            
+            if sel_len > 1 and len(pop_sel.z) > 1: # if able to shuffle
+                assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity
+            else:
+                assert selected_pop == pop_sel.z[picked[:sel_len]]
         else:
             assert selected_pop == []
 
@@ -399,7 +407,7 @@ class TestSimilarAnnotationSelectorRegion:
 
     # GENERATE_IDD_LIST_OF_NEURONS
 
-    def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
+    def test_generate_idd_list_of_neurons(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
         sel_len = pop_sel.parameters.num_of_cells
         picked_or = set(pop_sel.pick_close_to_annotation()) # not mocked!
@@ -413,6 +421,7 @@ class TestSimilarAnnotationSelectorRegion:
         if sel_len > 0:
             assert len(selected_pop) <= min(sel_len, len(pop_sel.z)) # check upper bound
             assert len(selected_pop) == len(picked)
-            assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity
+            if len(selected_pop) > 1: # if able to shuffle
+                assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity
         else:
             assert selected_pop == []
