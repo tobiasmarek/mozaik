@@ -109,7 +109,7 @@ from mozaik.sheets.population_selector import RCRandomN
 
 class TestRCRandomN:
     
-    @pytest.fixture(scope="class", params=[1000, 311, 1, 0]) # negative || float n?
+    @pytest.fixture(scope="class", params=[1000, 311, 1, 0, -1, -200])
     def init_pop_selector(self, request, mock_sheet):
         """A fixture for the initialization of the PopulationSelector object, created once"""
         params = ParameterSet({"num_of_cells": request.param})
@@ -127,23 +127,28 @@ class TestRCRandomN:
 
     # GENERATE_IDD_LIST_OF_NEURONS
 
-    def test_generate_idd_list_of_neurons(self, init_pop_selector): # what if n <= 0
+    def test_generate_idd_list_of_neurons(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
         sel_len = pop_sel.parameters.num_of_cells
         z = pop_sel.sheet.pop.all_cells.astype(int)
         
-        setup_mpi(mozaik_seed=513,pynn_seed=1023) # parametrize?
+        setup_mpi(mozaik_seed=513,pynn_seed=1023)
         selected_pop = pop_sel.generate_idd_list_of_neurons()
 
         if sel_len <= len(z): # if n <= population size
-            assert len(selected_pop) == sel_len
+            if sel_len >= 0: 
+                assert len(selected_pop) == sel_len
+            else:
+                assert len(selected_pop) == max(0, len(z) + sel_len)
         else:
             assert len(selected_pop) == len(z)
-        if sel_len > 0: 
+
+        if sel_len > 0 or (sel_len < 0 and max(0, len(z) + sel_len) != 0): # if at least one neuron is selected
             if len(selected_pop) > 1: # if able to shuffle
                 assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity
         else:
-            (selected_pop == [])
+            assert np.array_equal(selected_pop, np.array([]).astype(int))
+        
         assert len(selected_pop) == len(list(set(selected_pop))) # if unique
         assert all([id in z for id in selected_pop]) # if in the original population
 
@@ -154,7 +159,7 @@ from mozaik.sheets.population_selector import RCRandomPercentage
 
 class TestRCRandomPercentage:   
     
-    @pytest.fixture(scope="class", params=[1, 11, 20.55, 100, 100.1, 150, 0]) # negative n?
+    @pytest.fixture(scope="class", params=[1, 11, 20.55, 100, 100.1, 150, 0, -1, -200])
     def init_pop_selector(self, request, mock_sheet):
         params = ParameterSet({"percentage": request.param})
 
@@ -171,23 +176,28 @@ class TestRCRandomPercentage:
 
     # GENERATE_IDD_LIST_OF_NEURONS
 
-    def test_generate_idd_list_of_neurons(self, init_pop_selector): # what if percentage <= 0
+    def test_generate_idd_list_of_neurons(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
         z = pop_sel.sheet.pop.all_cells.astype(int)
         sel_len = int(len(z) * pop_sel.parameters.percentage/100)
         
-        setup_mpi(mozaik_seed=513,pynn_seed=1023) # parametrize?
+        setup_mpi(mozaik_seed=513,pynn_seed=1023)
         selected_pop = pop_sel.generate_idd_list_of_neurons()
 
         if pop_sel.parameters.percentage <= 100: # if percentage <= 100
-            assert len(selected_pop) == sel_len
+            if sel_len >= 0:
+                assert len(selected_pop) == sel_len
+            else:
+                assert len(selected_pop) == max(0, len(z) + sel_len)
         else:
             assert len(selected_pop) == len(z)
-        if sel_len > 0:
+
+        if sel_len > 0 or (sel_len < 0 and max(0, len(z) + sel_len) != 0): # if at least one neuron is selected
             if len(selected_pop) > 1: # if able to shuffle
                 assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity
         else:
-            (selected_pop == [])
+            assert np.array_equal(selected_pop, np.array([]).astype(int))
+
         assert len(selected_pop) == len(list(set(selected_pop))) # if unique
         assert all([id in z for id in selected_pop]) # if in the original population
 
@@ -305,8 +315,10 @@ class TestSimilarAnnotationSelector:
         yield MozaikExtendedParameterSet(f"tests/sheets/PopulationSelectorTests/param/{request.param}")
     
     
-    @pytest.fixture(scope="class")
-    def init_pop_selector(self, mock_sheet, params):
+    @pytest.fixture(scope="class", params=[1000, 311, 1, 0, -1, -200])
+    def init_pop_selector(self, request, mock_sheet, params):
+        params.num_of_cells = request.param
+
         yield SimilarAnnotationSelector(mock_sheet, params), params
 
 
@@ -327,35 +339,36 @@ class TestSimilarAnnotationSelector:
     def test_pick_close_to_annotation_zero_period(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
         vals = [pop_sel.sheet.get_neuron_annotation(i, pop_sel.parameters.annotation) for i in range(len(pop_sel.z))]
-        pop_sel.parameters.period = 0 # beware - mocked pop_sel.parameters are for all the functions in this class
+        pop_sel.parameters.period = 0
 
         picked = pop_sel.pick_close_to_annotation()
 
         assert len(picked) <= len(pop_sel.z)
-        assert len(picked) == len(list(set(picked))) # if unique # does it have to be unique?
+        assert len(picked) == len(list(set(picked))) # if unique
         assert all([id in np.arange(0, len(pop_sel.z)) for id in picked]) # if in the original population
         assert all([abs(vals[id] - pop_sel.parameters.value) <= pop_sel.parameters.distance for id in picked]) # check distance restriction with abs
 
 
-    def test_pick_close_to_annotation_non_zero_period(self, init_pop_selector):
+    @pytest.mark.parametrize("period", [2.0, 4.2, 200, -1])
+    def test_pick_close_to_annotation_non_zero_period(self, init_pop_selector, period):
         pop_sel, _ = init_pop_selector
         vals = [pop_sel.sheet.get_neuron_annotation(i, pop_sel.parameters.annotation) for i in range(len(pop_sel.z))]
-        pop_sel.parameters.period = 2.0 # beware - mocked pop_sel.parameters are for all the functions in this class
+        pop_sel.parameters.period = period
 
         picked = pop_sel.pick_close_to_annotation()
 
         assert len(picked) <= len(pop_sel.z)
-        assert len(picked) == len(list(set(picked))) # if unique # does it have to be unique?
+        assert len(picked) == len(list(set(picked))) # if unique
         assert all([id in np.arange(0, len(pop_sel.z)) for id in picked]) # if in the original population
         assert all([circular_dist(vals[id], pop_sel.parameters.value, pop_sel.parameters.period) <= pop_sel.parameters.distance for id in picked]) # check distance restriction circular_dist
 
 
     # GENERATE_IDD_LIST_OF_NEURONS
 
-    def test_generate_idd_list_of_neurons(self, init_pop_selector): # unfinished
+    def test_generate_idd_list_of_neurons(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
         sel_len = pop_sel.parameters.num_of_cells
-        picked = sorted(pop_sel.pick_close_to_annotation()) # not mocked! # shouldnt that be a set()?
+        picked = sorted(pop_sel.pick_close_to_annotation()) # not mocked!
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
         
@@ -365,12 +378,14 @@ class TestSimilarAnnotationSelector:
             else:
                 assert len(selected_pop) == len(pop_sel.z)
             
-            if sel_len > 1 and len(pop_sel.z) > 1: # if able to shuffle
+            if sel_len > 0 and len(pop_sel.z) > 1: # if able to shuffle
                 assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity
-            else:
-                assert selected_pop == pop_sel.z[picked[:sel_len]]
         else:
-            assert selected_pop == []
+            if len(picked) > 0: # if n < 0 and there are neurons to select
+                assert len(selected_pop) <= max(0, len(picked) + sel_len) # check upper bound
+            else:
+                assert np.array_equal(selected_pop, np.array([]).astype(int))
+                
 
 
 
@@ -384,8 +399,10 @@ class TestSimilarAnnotationSelectorRegion:
         yield MozaikExtendedParameterSet(f"tests/sheets/PopulationSelectorTests/param/{request.param}")
     
     
-    @pytest.fixture(scope="class")
-    def init_pop_selector(self, mock_sheet, params):
+    @pytest.fixture(scope="class", params=[1000, 311, 1, 0, -1, -200])
+    def init_pop_selector(self, request, mock_sheet, params):
+        params.num_of_cells = request.param
+
         yield SimilarAnnotationSelectorRegion(mock_sheet, params), params
 
 
@@ -419,9 +436,11 @@ class TestSimilarAnnotationSelectorRegion:
         selected_pop = pop_sel.generate_idd_list_of_neurons()
         
         if sel_len > 0:
-            assert len(selected_pop) <= min(sel_len, len(pop_sel.z)) # check upper bound
-            assert len(selected_pop) == len(picked)
-            if len(selected_pop) > 1: # if able to shuffle
+            assert len(selected_pop) == min(sel_len, len(picked))
+            if len(selected_pop) > 0 and len(pop_sel.z) > 1: # if able to shuffle
                 assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity
         else:
-            assert selected_pop == []
+            if len(picked) > 0: # if n < 0 and there are neurons to select
+                assert len(selected_pop) <= max(0, len(picked) + sel_len) # check upper bound
+            else:
+                assert np.array_equal(selected_pop, np.array([]).astype(int))
