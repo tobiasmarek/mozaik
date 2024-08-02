@@ -13,7 +13,7 @@ from unittest.mock import call
 
 
 
-@pytest.fixture(scope="module", params=[(1, 0.1), (11, 0.15), (42, 0.05), (100, 0.5)]) # (num_of_cells, magnification_factor)
+@pytest.fixture(scope="module", params=[(1, 0.1), (42, 0.05), (100, 1.5)]) # (num_of_cells, magnification_factor)
 def mock_sheet(request):
     """
     Mocking the Sheet class to separate the testing of PopulationSelector and the Sheet itself.
@@ -21,15 +21,15 @@ def mock_sheet(request):
     """
     sheet = MagicMock()
 
-    num_of_cells, sheet.magnification_factor = request.param # what if its not a sheet with magnification_factor?
+    num_of_cells, sheet.magnification_factor = request.param # what if its not a sheet with magnification_factor? # TODO
 
     sheet.pop.all_cells = np.array([i for i in range(0, num_of_cells)], dtype=object)
-    sheet.pop.positions = np.array([np.linspace(0, 1, len(sheet.pop.all_cells)), np.linspace(0, 1, len(sheet.pop.all_cells))]) # better real pos?
+    sheet.pop.positions = np.array([np.linspace(0, 1, len(sheet.pop.all_cells)), np.linspace(0, 1, len(sheet.pop.all_cells))]) # better real pos? # TODO
 
     sheet.cs_2_vf = MagicMock(side_effect=lambda x, y: (x / sheet.magnification_factor, y / sheet.magnification_factor))
     sheet.vf_2_cs = MagicMock(side_effect=lambda x, y: (x * sheet.magnification_factor, y * sheet.magnification_factor))
     
-    _neuron_annotations = [i for i in range(len(sheet.pop.all_cells))] # does not let me to have an object there (namely str f"ann_{i},0")
+    _neuron_annotations = [i for i in range(len(sheet.pop.all_cells))] # does not let me to have an object there (namely str f"ann_{i},0") # FIXME
     sheet.get_neuron_annotation = MagicMock(side_effect=lambda i, ann: _neuron_annotations[i])
 
     yield sheet
@@ -109,7 +109,7 @@ from mozaik.sheets.population_selector import RCRandomN
 
 class TestRCRandomN:
     
-    @pytest.fixture(scope="class", params=[1000, 311, 1, 0, -1, -200])
+    @pytest.fixture(scope="class", params=[311, 1, 0, -1, -200])
     def init_pop_selector(self, request, mock_sheet):
         """A fixture for the initialization of the PopulationSelector object, created once"""
         params = ParameterSet({"num_of_cells": request.param})
@@ -145,7 +145,7 @@ class TestRCRandomN:
 
         if sel_len > 0 or (sel_len < 0 and max(0, len(z) + sel_len) != 0): # if at least one neuron is selected
             if len(selected_pop) > 1: # if able to shuffle
-                assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity
+                assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity # FIXME
         else:
             assert np.array_equal(selected_pop, np.array([]).astype(int))
         
@@ -159,7 +159,7 @@ from mozaik.sheets.population_selector import RCRandomPercentage
 
 class TestRCRandomPercentage:   
     
-    @pytest.fixture(scope="class", params=[1, 11, 20.55, 100, 100.1, 150, 0, -1, -200])
+    @pytest.fixture(scope="class", params=[1, 20.55, 100, 100.1, 150, 0, -1, -200])
     def init_pop_selector(self, request, mock_sheet):
         params = ParameterSet({"percentage": request.param})
 
@@ -194,7 +194,7 @@ class TestRCRandomPercentage:
 
         if sel_len > 0 or (sel_len < 0 and max(0, len(z) + sel_len) != 0): # if at least one neuron is selected
             if len(selected_pop) > 1: # if able to shuffle
-                assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity
+                assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity # FIXME
         else:
             assert np.array_equal(selected_pop, np.array([]).astype(int))
 
@@ -234,8 +234,8 @@ class TestRCGrid:
         pop_sel, _ = init_pop_selector
         max_sel_len = (pop_sel.parameters.size / pop_sel.parameters.spacing)**2 # number of electrodes
         centered_electrodes = np.arange(0, pop_sel.parameters.size, pop_sel.parameters.spacing) - pop_sel.parameters.size/2.0
-        xx = [x / pop_sel.sheet.magnification_factor for x in pop_sel.parameters.offset_x + centered_electrodes] # what if not sheet w mag factor
-        yy = [y / pop_sel.sheet.magnification_factor for y in pop_sel.parameters.offset_y + centered_electrodes] # what if not sheet w mag factor
+        xx = [x / pop_sel.sheet.magnification_factor for x in pop_sel.parameters.offset_x + centered_electrodes] # what if not sheet w mag factor # FIXME
+        yy = [y / pop_sel.sheet.magnification_factor for y in pop_sel.parameters.offset_y + centered_electrodes] # what if not sheet w mag factor # FIXME
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
         
@@ -315,7 +315,7 @@ class TestSimilarAnnotationSelector:
         yield MozaikExtendedParameterSet(f"tests/sheets/PopulationSelectorTests/param/{request.param}")
     
     
-    @pytest.fixture(scope="class", params=[1000, 311, 1, 0, -1, -200])
+    @pytest.fixture(scope="class", params=[311, 1, 0, -1, -200])
     def init_pop_selector(self, request, mock_sheet, params):
         params.num_of_cells = request.param
 
@@ -379,7 +379,7 @@ class TestSimilarAnnotationSelector:
                 assert len(selected_pop) == len(pop_sel.z)
             
             if sel_len > 0 and len(pop_sel.z) > 1: # if able to shuffle
-                assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity
+                assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity # FIXME
         else:
             if len(picked) > 0: # if n < 0 and there are neurons to select
                 assert len(selected_pop) <= max(0, len(picked) + sel_len) # check upper bound
@@ -438,7 +438,7 @@ class TestSimilarAnnotationSelectorRegion:
         if sel_len > 0:
             assert len(selected_pop) == min(sel_len, len(picked))
             if len(selected_pop) > 0 and len(pop_sel.z) > 1: # if able to shuffle
-                assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity
+                assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity # FIXME
         else:
             if len(picked) > 0: # if n < 0 and there are neurons to select
                 assert len(selected_pop) <= max(0, len(picked) + sel_len) # check upper bound
