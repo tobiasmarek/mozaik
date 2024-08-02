@@ -100,7 +100,7 @@ class TestSheet():
         sheet, params = init_sheet
         sheet._pop, sheet.pop = None, _pop_mock
 
-        mozaik.setup_mpi() # initialize mozaik.rng for shuffling
+        mozaik.setup_mpi(mozaik_seed=513,pynn_seed=1023) # initializing MPI for shuffle
         sheet.setup_to_record_list()
 
         if params.recorders == {}:
@@ -328,7 +328,7 @@ class TestSheet():
 
     # GET_DATA
 
-    @pytest.mark.parametrize("stimulus_duration", [None, 4.2, 0, -1]) # unused?
+    @pytest.mark.parametrize("stimulus_duration", [None, 4.2, 0, -1]) # unused? # FIXME
     def test_get_data_assertions(self, init_sheet, _pop_mock, stimulus_duration):
         def get_mocked_st():
             st = MagicMock(value = 50, t_start = 10, t_stop = 20, annotations = OrderedDict([('source_id', 1)])) # parametrize?
@@ -392,7 +392,7 @@ class TestSheet():
         sheet._pop, sheet.pop = None, _pop_mock
 
         with patch.object(mozaik.getMozaikLogger(), 'debug', side_effect = RuntimeError()) as mock_debug:
-            with pytest.raises(RuntimeError): # to stop the function from proceeding further - needs revision
+            with pytest.raises(RuntimeError): # to stop the function from proceeding further - needs revision # FIXME
                 sheet.get_data()
             
             mock_debug.assert_called_once()
@@ -601,7 +601,7 @@ class TestVisualCorticalUniformSheet:
 
 
     @pytest.fixture(scope="class") # (magnification_factor, sx, sy, density)
-    def init_sheet(self, mock_model, params): # fails for smaller values (1.0, 80, 90, 3), (1, 60, 50, 6), (1, 180, 45, 5)])
+    def init_sheet(self, mock_model, params): # fails for smaller values (1.0, 80, 90, 3), (1, 60, 50, 6), (1, 180, 45, 5)]) # FIXME
         yield VisualCorticalUniformSheet(mock_model, params), params
 
 
@@ -654,7 +654,7 @@ class TestVisualCorticalUniformSheet3D:
 
 
     @pytest.fixture(scope="class") # (magnification_factor, sx, sy, density, min_depth, max_depth) # What happens if min_depth > max depth
-    def init_sheet(self, mock_model, params): # fails for smaller values (1.2, 2.1, 3, 6, 3, 3), (4., .5, 6, 5, 5, 10)]) 
+    def init_sheet(self, mock_model, params): # fails for smaller values (1.2, 2.1, 3, 6, 3, 3), (4., .5, 6, 5, 5, 10)]) # FIXME
         yield VisualCorticalUniformSheet3D(mock_model, params), params
 
 
