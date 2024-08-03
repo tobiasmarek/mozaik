@@ -296,7 +296,7 @@ class TestSheet():
     # DESCRIBE
 
     @pytest.mark.parametrize("template,render,result", [('default', lambda t, c: Template(t).safe_substitute(c), None), (None, lambda t, c: c, {'name': 'Sheet'})])
-    def test_describe(self, init_sheet, template, render, result): # test more than just Sheet class
+    def test_describe(self, init_sheet, template, render, result):
         sheet, _ = init_sheet
 
         assert sheet.describe(template, render) == result
@@ -328,7 +328,7 @@ class TestSheet():
 
     # GET_DATA
 
-    @pytest.mark.parametrize("stimulus_duration", [None, 4.2, 0, -1]) # unused? # FIXME
+    @pytest.mark.parametrize("stimulus_duration", [None, 4.2, -1]) # bool parameter would be sufficient in mozaik code
     def test_get_data_assertions(self, init_sheet, _pop_mock, stimulus_duration):
         def get_mocked_st():
             st = MagicMock(value = 50, t_start = 10, t_stop = 20, annotations = OrderedDict([('source_id', 1)])) # parametrize?
@@ -530,8 +530,10 @@ class TestSheetWithMagnificationFactor:
         yield MozaikExtendedParameterSet(f"tests/sheets/SheetsTests/param/{request.param}")
 
 
-    @pytest.fixture(scope="class") # (magnification_factor, sx, sy)
-    def init_sheet(self, mock_model, params):
+    @pytest.fixture(scope="class", params=[(1.2, 150, 300), (0.5, 42, 31.4)]) # (magnification_factor, sx, sy)
+    def init_sheet(self, request, mock_model, params):
+        params.magnification_factor, params.sx, params.sy = request.param
+
         yield MockedSheetWithMagnificationFactor(mock_model, params), params
 
 
@@ -600,8 +602,10 @@ class TestVisualCorticalUniformSheet:
         yield MozaikExtendedParameterSet(f"tests/sheets/SheetsTests/param/{request.param}")
 
 
-    @pytest.fixture(scope="class") # (magnification_factor, sx, sy, density)
-    def init_sheet(self, mock_model, params): # fails for smaller values (1.0, 80, 90, 3), (1, 60, 50, 6), (1, 180, 45, 5)]) # FIXME
+    @pytest.fixture(scope="class", params=[250, 5000]) # (magnification_factor, sx, sy, density)
+    def init_sheet(self, request, mock_model, params): # fails for smaller values (1.0, 80, 90, 3), (1, 60, 50, 6), (1, 180, 45, 5)]) # FIXME
+        params.density = request.param
+
         yield VisualCorticalUniformSheet(mock_model, params), params
 
 
@@ -653,8 +657,10 @@ class TestVisualCorticalUniformSheet3D:
         yield MozaikExtendedParameterSet(f"tests/sheets/SheetsTests/param/{request.param}")
 
 
-    @pytest.fixture(scope="class") # (magnification_factor, sx, sy, density, min_depth, max_depth) # What happens if min_depth > max depth
-    def init_sheet(self, mock_model, params): # fails for smaller values (1.2, 2.1, 3, 6, 3, 3), (4., .5, 6, 5, 5, 10)]) # FIXME
+    @pytest.fixture(scope="class", params=[(40, 100), (100, 40)]) # (magnification_factor, sx, sy, density, min_depth, max_depth)
+    def init_sheet(self, request, mock_model, params): # fails for smaller values (1.2, 2.1, 3, 6, 3, 3), (4., .5, 6, 5, 5, 10)]) # FIXME
+        params.min_depth, params.max_depth = request.param
+
         yield VisualCorticalUniformSheet3D(mock_model, params), params
 
 
