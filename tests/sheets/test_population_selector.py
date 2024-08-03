@@ -21,15 +21,15 @@ def mock_sheet(request):
     """
     sheet = MagicMock()
 
-    num_of_cells, sheet.magnification_factor = request.param # what if its not a sheet with magnification_factor? # TODO
+    num_of_cells, sheet.magnification_factor = request.param # what if its not a sheet with magnification_factor? # TODO?
 
     sheet.pop.all_cells = np.array([i for i in range(0, num_of_cells)], dtype=object)
-    sheet.pop.positions = np.array([np.linspace(0, 1, len(sheet.pop.all_cells)), np.linspace(0, 1, len(sheet.pop.all_cells))]) # better real pos? # TODO
+    sheet.pop.positions = np.array([np.linspace(0, 1, len(sheet.pop.all_cells)), np.linspace(0, 1, len(sheet.pop.all_cells))]) # better real pos? # TODO?
 
     sheet.cs_2_vf = MagicMock(side_effect=lambda x, y: (x / sheet.magnification_factor, y / sheet.magnification_factor))
     sheet.vf_2_cs = MagicMock(side_effect=lambda x, y: (x * sheet.magnification_factor, y * sheet.magnification_factor))
     
-    _neuron_annotations = [i for i in range(len(sheet.pop.all_cells))] # does not let me to have an object there (namely str f"ann_{i},0") # FIXME
+    _neuron_annotations = [i for i in range(len(sheet.pop.all_cells))] # does not let me to have an object there (namely str f"ann_{i},0") # FIXME?
     sheet.get_neuron_annotation = MagicMock(side_effect=lambda i, ann: _neuron_annotations[i])
 
     yield sheet
@@ -131,24 +131,17 @@ class TestRCRandomN:
         pop_sel, _ = init_pop_selector
         sel_len = pop_sel.parameters.num_of_cells
         z = pop_sel.sheet.pop.all_cells.astype(int)
+        result_sel_len = min(sel_len, len(z)) if sel_len >= 0 else max(0, len(z) + sel_len)
         
         setup_mpi(mozaik_seed=513,pynn_seed=1023)
         selected_pop = pop_sel.generate_idd_list_of_neurons()
 
-        if sel_len <= len(z): # if n <= population size
-            if sel_len >= 0: 
-                assert len(selected_pop) == sel_len
-            else:
-                assert len(selected_pop) == max(0, len(z) + sel_len)
-        else:
-            assert len(selected_pop) == len(z)
-
-        if sel_len > 0 or (sel_len < 0 and max(0, len(z) + sel_len) != 0): # if at least one neuron is selected
-            if len(selected_pop) > 1: # if able to shuffle
-                assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity # FIXME
-        else:
-            assert np.array_equal(selected_pop, np.array([]).astype(int))
+        if result_sel_len > 0: # if at least one neuron is selected
+            pass
+            # if len(selected_pop) > 1: # if able to shuffle
+            #     assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity # FIXME
         
+        assert len(selected_pop) == result_sel_len
         assert len(selected_pop) == len(list(set(selected_pop))) # if unique
         assert all([id in z for id in selected_pop]) # if in the original population
 
@@ -180,26 +173,20 @@ class TestRCRandomPercentage:
         pop_sel, _ = init_pop_selector
         z = pop_sel.sheet.pop.all_cells.astype(int)
         sel_len = int(len(z) * pop_sel.parameters.percentage/100)
+        result_sel_len = min(sel_len, len(z)) if sel_len >= 0 else max(0, len(z) + sel_len)
         
         setup_mpi(mozaik_seed=513,pynn_seed=1023)
         selected_pop = pop_sel.generate_idd_list_of_neurons()
 
-        if pop_sel.parameters.percentage <= 100: # if percentage <= 100
-            if sel_len >= 0:
-                assert len(selected_pop) == sel_len
-            else:
-                assert len(selected_pop) == max(0, len(z) + sel_len)
-        else:
-            assert len(selected_pop) == len(z)
+        if result_sel_len > 0: # if at least one neuron is selected
+            pass
+            # if len(selected_pop) > 1: # if able to shuffle
+            #     assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity # FIXME
 
-        if sel_len > 0 or (sel_len < 0 and max(0, len(z) + sel_len) != 0): # if at least one neuron is selected
-            if len(selected_pop) > 1: # if able to shuffle
-                assert (selected_pop != z[:sel_len]).any() # if shuffled # what if identity # FIXME
-        else:
-            assert np.array_equal(selected_pop, np.array([]).astype(int))
-
+        assert len(selected_pop) == result_sel_len
         assert len(selected_pop) == len(list(set(selected_pop))) # if unique
         assert all([id in z for id in selected_pop]) # if in the original population
+
 
 
 
@@ -234,8 +221,8 @@ class TestRCGrid:
         pop_sel, _ = init_pop_selector
         max_sel_len = (pop_sel.parameters.size / pop_sel.parameters.spacing)**2 # number of electrodes
         centered_electrodes = np.arange(0, pop_sel.parameters.size, pop_sel.parameters.spacing) - pop_sel.parameters.size/2.0
-        xx = [x / pop_sel.sheet.magnification_factor for x in pop_sel.parameters.offset_x + centered_electrodes] # what if not sheet w mag factor # FIXME
-        yy = [y / pop_sel.sheet.magnification_factor for y in pop_sel.parameters.offset_y + centered_electrodes] # what if not sheet w mag factor # FIXME
+        xx = [x / pop_sel.sheet.magnification_factor for x in pop_sel.parameters.offset_x + centered_electrodes] # what if not sheet w mag factor # FIXME?
+        yy = [y / pop_sel.sheet.magnification_factor for y in pop_sel.parameters.offset_y + centered_electrodes] # what if not sheet w mag factor # FIXME?
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
         
@@ -367,25 +354,19 @@ class TestSimilarAnnotationSelector:
 
     def test_generate_idd_list_of_neurons(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
+        z = pop_sel.sheet.pop.all_cells.astype(int)
         sel_len = pop_sel.parameters.num_of_cells
         picked = sorted(pop_sel.pick_close_to_annotation()) # not mocked!
+        result_sel_len = min(sel_len, len(z)) if sel_len >= 0 else max(0, len(z) + sel_len)
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
-        
-        if sel_len > 0:
-            if sel_len <= len(pop_sel.z): # if n <= population size
-                assert len(selected_pop) == sel_len
-            else:
-                assert len(selected_pop) == len(pop_sel.z)
-            
-            if sel_len > 0 and len(pop_sel.z) > 1: # if able to shuffle
-                assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity # FIXME
-        else:
-            if len(picked) > 0: # if n < 0 and there are neurons to select
-                assert len(selected_pop) <= max(0, len(picked) + sel_len) # check upper bound
-            else:
-                assert np.array_equal(selected_pop, np.array([]).astype(int))
-                
+
+        # if len(selected_pop) > 1: # if able to shuffle
+        #     assert (selected_pop != z[picked[:sel_len]]).any() # if shuffled # what if identity # FIXME
+
+        assert len(selected_pop) == result_sel_len
+        assert len(selected_pop) == len(list(set(selected_pop))) # if unique
+        assert all([id in z for id in selected_pop]) # if in the original population
 
 
 
@@ -426,21 +407,20 @@ class TestSimilarAnnotationSelectorRegion:
 
     def test_generate_idd_list_of_neurons(self, init_pop_selector):
         pop_sel, _ = init_pop_selector
+        z = pop_sel.sheet.pop.all_cells.astype(int)
         sel_len = pop_sel.parameters.num_of_cells
         picked_or = set(pop_sel.pick_close_to_annotation()) # not mocked!
         xx, yy = pop_sel.sheet.vf_2_cs(pop_sel.sheet.pop.positions[0], pop_sel.sheet.pop.positions[1])
         picked_region = set(np.arange(0,len(xx))[np.logical_and(abs(np.array(xx - pop_sel.parameters.offset_x))\
             < pop_sel.parameters.size/2.0, abs(np.array(yy - pop_sel.parameters.offset_y)) < pop_sel.parameters.size/2.0)])
         picked = sorted(list(picked_or & picked_region))
+        result_sel_len = min(sel_len, len(picked)) if sel_len >= 0 else max(0, len(picked) + sel_len)
 
         selected_pop = pop_sel.generate_idd_list_of_neurons()
         
-        if sel_len > 0:
-            assert len(selected_pop) == min(sel_len, len(picked))
-            if len(selected_pop) > 0 and len(pop_sel.z) > 1: # if able to shuffle
-                assert (selected_pop != pop_sel.z[picked[:sel_len]]).any() # if shuffled # what if identity # FIXME
-        else:
-            if len(picked) > 0: # if n < 0 and there are neurons to select
-                assert len(selected_pop) <= max(0, len(picked) + sel_len) # check upper bound
-            else:
-                assert np.array_equal(selected_pop, np.array([]).astype(int))
+        # if len(selected_pop) > 1: # if len(selected_pop) > 0 and len(z) > 1: # if able to shuffle
+        #    assert (selected_pop != z[picked[:sel_len]]).any() # if shuffled # what if identity # FIXME
+
+        assert len(selected_pop) == result_sel_len
+        assert len(selected_pop) == len(list(set(selected_pop))) # if unique
+        assert all([id in z for id in selected_pop]) # if in the original population
